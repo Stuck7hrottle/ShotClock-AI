@@ -1,4 +1,4 @@
-# rof-from-video
+# ShotClock-AI
 
 Estimate a firearm's **rate of fire** from a video by detecting **shot events** using **audio-first detection** with optional **muzzle flash confirmation** from video.
 
