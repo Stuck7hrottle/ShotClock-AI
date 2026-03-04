@@ -1,16 +1,17 @@
+# ui/streamlit_app.py
+import json
 import tempfile
 from pathlib import Path
 
-import streamlit as st
-import pandas as pd
 import matplotlib.pyplot as plt
+import pandas as pd
+import streamlit as st
 
-from rof_detector.io.ffmpeg import extract_audio_wav
 from rof_detector.audio.detect import detect_shots_audio
-from rof_detector.vision.flash_detect import confirm_shots_with_flash
 from rof_detector.fusion.fuse import fuse_scores
+from rof_detector.io.ffmpeg import extract_audio_wav
 from rof_detector.metrics.rof import compute_rof
-
+from rof_detector.vision.flash_detect import confirm_shots_with_flash
 
 st.set_page_config(page_title="ShotClock AI (rof-from-video)", layout="wide")
 
@@ -29,7 +30,7 @@ with st.sidebar:
     use_vision = st.checkbox("Enable muzzle-flash confirmation", value=False)
     roi_str = st.text_input('ROI "x,y,w,h" (recommended)', value="")
     roi_interactive = st.checkbox("Pick ROI interactively (desktop)", value=False)
-    st.caption("Vision requires opencv-python installed (pip install -e '.[video,ui]').")
+    st.caption("Vision requires opencv-python installed (pip install -e '.[dev,ui,video]').")
 
 uploaded_file = st.file_uploader("Upload Video (MP4, MOV, AVI)", type=["mp4", "mov", "avi"])
 
@@ -70,6 +71,7 @@ if uploaded_file:
         if not fused:
             st.warning("No shots detected. Increase sensitivity or check audio quality.")
         else:
+            # Table (classic “shot clock” style) + confidence
             rows = []
             for i, e in enumerate(fused):
                 t = float(e["t"])
@@ -86,11 +88,48 @@ if uploaded_file:
                 )
             df = pd.DataFrame(rows)
 
+            # Build downloadable artifacts
+            csv_data = df.to_csv(index=False).encode("utf-8")
+
+            report = {
+                "input": {"video": uploaded_file.name},
+                "params": {
+                    "environment": environment,
+                    "sensitivity": float(sensitivity),
+                    "min_separation_ms": int(min_sep_ms),
+                    "echo_window_ms": int(echo_ms),
+                    "use_vision": bool(use_vision),
+                    "roi": roi_str.strip() if roi_str.strip() else None,
+                    "roi_interactive": bool(roi_interactive),
+                },
+                "events": fused,
+                "rof": rof,
+            }
+            json_data = json.dumps(report, indent=2).encode("utf-8")
+
             col1, col2 = st.columns(2)
 
             with col1:
                 st.subheader("Shot Data")
                 st.dataframe(df, use_container_width=True)
+
+                dl1, dl2 = st.columns(2)
+                with dl1:
+                    st.download_button(
+                        label="⬇️ Download CSV",
+                        data=csv_data,
+                        file_name="shot_data.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                    )
+                with dl2:
+                    st.download_button(
+                        label="⬇️ Download JSON",
+                        data=json_data,
+                        file_name="analysis.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
 
             with col2:
                 st.subheader("Split Consistency")
@@ -107,15 +146,4 @@ if uploaded_file:
                 st.success("Detected 1 shot.")
 
             with st.expander("Details (JSON)"):
-                st.json(
-                    {
-                        "events": fused,
-                        "rof": rof,
-                        "params": {
-                            "environment": environment,
-                            "sensitivity": float(sensitivity),
-                            "min_separation_ms": int(min_sep_ms),
-                            "echo_window_ms": int(echo_ms),
-                        },
-                    }
-                )
+                st.json(report)
