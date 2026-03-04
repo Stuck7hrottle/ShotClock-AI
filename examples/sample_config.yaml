@@ -1,0 +1,6 @@
+environment: auto
+sensitivity: 0.5
+min_separation_ms: 35
+echo_window_ms: 60
+burst_gap_ms: 400
+roi: null
