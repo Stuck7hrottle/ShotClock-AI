@@ -47,17 +47,17 @@ Install on Debian/Ubuntu:
 sudo apt update
 sudo apt install ffmpeg
 
-Verify installation:
+## Verify installation:
 
 ffmpeg -version
 Python Setup
 
-Create a virtual environment:
+## Create a virtual environment:
 
 python -m venv .venv
 source .venv/bin/activate
 
-Install the project:
+## Install the project:
 
 pip install -e ".[dev,ui]"
 
@@ -66,11 +66,11 @@ Optional (for video confirmation features):
 pip install -e ".[dev,ui,video]"
 Running the Web UI
 
-Launch the Streamlit interface:
+## Launch the Streamlit interface:
 
 streamlit run ui/streamlit_app.py
 
-Then open:
+## Then open:
 
 http://localhost:8501
 UI Capabilities
@@ -85,7 +85,7 @@ View shot tables and split charts
 
 Export CSV / JSON reports
 
-Optional:
+## Optional:
 
 Enable muzzle flash confirmation
 
