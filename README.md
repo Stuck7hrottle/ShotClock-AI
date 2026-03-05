@@ -1,174 +1,56 @@
-# ShotClock-AI
+🎯 ShotClock-AI
+Precise Firearm Rate-of-Fire (ROF) Estimation from Video
 
-Estimate a firearm's **rate of fire (ROF)** from video by detecting **shot events** using audio impulse detection with optional **muzzle flash confirmation** from video.
+ShotClock-AI uses advanced audio impulse detection and optional muzzle flash verification to analyze firearm performance. Whether you are a competitive shooter tracking split times or a hobbyist testing equipment, this tool provides laboratory-grade cadence metrics from standard video footage.
 
-This tool is useful for analyzing training footage, competition shooting, testing videos, and other recorded firearm activity.
+🚀 Key Features
+Hybrid Detection Engine: Uses adaptive onset detection for audio, with optional OpenCV-powered muzzle flash confirmation.
 
-> ⚠️ This project analyzes **existing footage only**. It does **not** provide instructions for firearm use.
+Advanced Echo Suppression: Indoor-friendly clustering prevents double-counting shots caused by range reverberations.
 
----
+Rich Analytics: Generates detailed metrics including split times, instantaneous RPM, and burst segmentation.
 
-# Features
+Interactive Web UI: A full-featured Streamlit dashboard for visual waveform analysis and data export.
 
-- Extract audio from video using **ffmpeg**
-- Detect shot-like **impulses** using adaptive onset detection
-- Indoor-friendly **echo clustering** to avoid double-counting
-- Adjustable **sensitivity control** (0.1–1.0)
-- Optional **video confirmation** using muzzle flash detection
-- Burst segmentation and cadence analysis
+Professional Exports: Save your data in JSON or CSV formats, or generate annotated videos showing exactly where shots were detected.
 
-### Metrics Generated
+🛠 Installation
+1. System Requirement: FFmpeg
+This project relies on ffmpeg for high-fidelity audio extraction.
 
-- Shot timestamps
-- Split times between shots
-- Instantaneous ROF
-- Mean ROF
-- Burst segmentation
-- Burst statistics
-
-### Export Options
-
-- JSON report
-- CSV event data
-- Waveform visualization
-- Annotated video with detected shots
-
----
-
-# Installation
-
-## System Dependencies (Linux)
-
-This project requires **ffmpeg**.
-
-Install on Debian/Ubuntu:
-
-```bash
-sudo apt update
-sudo apt install ffmpeg
-
-## Verify installation:
-
-ffmpeg -version
-Python Setup
-
-## Create a virtual environment:
-
+Bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install ffmpeg
+2. Python Setup
+Bash
 python -m venv .venv
 source .venv/bin/activate
-
-## Install the project:
-
-pip install -e ".[dev,ui]"
-
-Optional (for video confirmation features):
-
 pip install -e ".[dev,ui,video]"
-Running the Web UI
+💻 Usage
+Interactive Web Dashboard
+The easiest way to analyze footage is through the Streamlit UI:
 
-## Launch the Streamlit interface:
-
+Bash
 streamlit run ui/streamlit_app.py
+Command Line Interface
+For power users and batch processing:
 
-## Then open:
+Bash
+# Basic audio-first detection
+rof detect input.mp4 --out results.json
 
-http://localhost:8501
-UI Capabilities
+# Advanced detection with video confirmation
+rof detect input.mp4 --roi "500,400,100,100" --annotate output.mp4
+📊 Analytics & Metrics
+ShotClock-AI provides comprehensive feedback for every session:
 
-Upload video files
+Shots & Bursts: Automatic grouping of shots into distinct strings of fire.
 
-Adjust detection sensitivity
+Cadence Stability: Coefficient of Variation (CV) tracking to measure how steady your rhythm is.
 
-Tune echo suppression
+Split Consistency: Visual charts in the UI to identify performance trends.
 
-View shot tables and split charts
+⚖️ License
+Distributed under the MIT License. See LICENSE for more information.
 
-Export CSV / JSON reports
-
-## Optional:
-
-Enable muzzle flash confirmation
-
-Provide ROI coordinates (x,y,w,h)
-
-Command Line Usage
-
-Basic analysis:
-
-rof detect input.mp4 \
-  --out results.json \
-  --csv results.csv \
-  --plot waveform.png
-
-With muzzle flash confirmation:
-
-rof detect input.mp4 \
-  --roi "x,y,w,h" \
-  --annotate annotated.mp4
-
-Interactive ROI selection:
-
-rof detect input.mp4 --roi-interactive
-Example Output
-
-Example summary:
-
-Shots detected: 14
-Average ROF: 742 RPM
-Median ROF: 735 RPM
-Burst count: 2
-
-Example CSV:
-
-Shot	Timestamp	Split	Inst RPM
-1	0.212	—	—
-2	0.335	0.123	487
-3	0.458	0.123	487
-Development
-
-Install development environment:
-
-pip install -e ".[dev,ui,video]"
-
-Run tests:
-
-pytest -q
-
-Lint code:
-
-ruff check .
-ruff format .
-Project Structure
-src/
-  rof_detector/
-    audio/        # shot detection
-    vision/       # flash detection
-    fusion/       # audio + video fusion
-    metrics/      # ROF calculations
-    viz/          # plots / video annotation
-    io/           # ffmpeg utilities
-
-ui/
-  streamlit_app.py
-
-tests/
-  unit tests
-Roadmap
-
-Future improvements planned:
-
-automatic muzzle detection
-
-improved flash detection
-
-waveform visualization in UI
-
-automatic sensitivity calibration
-
-batch video processing
-
-cadence stability metrics
-
-License
-
-MIT
+⚠️ Disclaimer: This tool is for analyzing existing footage only. It does not provide instructions for the use or handling of firearms.

@@ -25,14 +25,20 @@ def detect(
     csv: Optional[Path] = typer.Option(None, help="Optional CSV export path."),
     plot: Optional[Path] = typer.Option(None, help="Optional waveform plot PNG path."),
     annotate: Optional[Path] = typer.Option(None, help="Optional annotated video output path."),
-    roi: Optional[str] = typer.Option(None, help='ROI "x,y,w,h" for muzzle region (video confirmation).'),
+    roi: Optional[str] = typer.Option(
+        None, help='ROI "x,y,w,h" for muzzle region (video confirmation).'
+    ),
     roi_interactive: bool = typer.Option(False, help="Interactively select ROI on first frame."),
     no_vision: bool = typer.Option(False, help="Disable vision confirmation even if ROI provided."),
-    environment: str = typer.Option("auto", help="auto|indoor|outdoor: adjusts echo handling defaults."),
+    environment: str = typer.Option(
+        "auto", help="auto|indoor|outdoor: adjusts echo handling defaults."
+    ),
     sensitivity: float = typer.Option(
         0.5, help="Detection sensitivity (0.1 to 1.0). Higher => more detections."
     ),
-    min_separation_ms: int = typer.Option(35, help="Minimum time between shots to avoid double counts."),
+    min_separation_ms: int = typer.Option(
+        35, help="Minimum time between shots to avoid double counts."
+    ),
     echo_window_ms: int = typer.Option(60, help="Cluster/merge window to suppress indoor echoes."),
     burst_gap_ms: int = typer.Option(400, help="Gap threshold for new burst segmentation."),
 ):

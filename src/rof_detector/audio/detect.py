@@ -22,8 +22,8 @@ def _frame_rms(x: np.ndarray, frame: int, hop: int) -> np.ndarray:
 
 
 def _onset_function(x: np.ndarray, sr: int) -> tuple[np.ndarray, int]:
-    frame = int(0.010 * sr)   # 10ms
-    hop = int(0.0025 * sr)    # 2.5ms
+    frame = int(0.010 * sr)  # 10ms
+    hop = int(0.0025 * sr)  # 2.5ms
     rms = _frame_rms(x, frame, hop)
     diff = np.maximum(0.0, np.diff(rms, prepend=rms[0]))
     m = float(np.max(diff) + 1e-12)

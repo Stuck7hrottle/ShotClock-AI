@@ -22,7 +22,9 @@ st.title("🎯 ShotClock AI: Rate of Fire Analyzer")
 st.write("Upload a video to detect shots (audio-first) and compute splits / ROF.")
 
 
-def plot_waveform_window(wav_path: Path, events: list[dict], center_s: float, width_s: float) -> None:
+def plot_waveform_window(
+    wav_path: Path, events: list[dict], center_s: float, width_s: float
+) -> None:
     sr, x = wavfile.read(str(wav_path))
     if x.ndim > 1:
         x = x[:, 0]
@@ -83,12 +85,18 @@ with st.sidebar:
     st.header("Detection Settings")
     environment = st.selectbox("Environment", ["auto", "indoor", "outdoor"], index=0)
     sensitivity = st.slider("Sensitivity", min_value=0.1, max_value=1.0, value=0.5, step=0.05)
-    min_sep_ms = st.number_input("Min separation (ms)", min_value=10, max_value=200, value=35, step=5)
-    echo_ms = st.number_input("Echo merge window (ms)", min_value=0, max_value=200, value=60, step=5)
+    min_sep_ms = st.number_input(
+        "Min separation (ms)", min_value=10, max_value=200, value=35, step=5
+    )
+    echo_ms = st.number_input(
+        "Echo merge window (ms)", min_value=0, max_value=200, value=60, step=5
+    )
 
     st.divider()
     st.header("Burst Settings")
-    burst_gap_ms = st.number_input("Burst gap (ms)", min_value=50, max_value=2000, value=400, step=50)
+    burst_gap_ms = st.number_input(
+        "Burst gap (ms)", min_value=50, max_value=2000, value=400, step=50
+    )
     st.caption("If the gap between shots exceeds this, a new burst starts.")
 
     st.divider()
@@ -207,13 +215,29 @@ if uploaded_file:
                 {
                     "Burst #": bi + 1,
                     "Shots": int(bs.get("n_shots", seg_times.size)),
-                    "Start (s)": round(float(bs.get("start_t", seg_times[0])), 3) if seg_times.size else None,
-                    "End (s)": round(float(bs.get("end_t", seg_times[-1])), 3) if seg_times.size else None,
-                    "Duration (s)": round(float(bs.get("duration_s", (seg_times[-1] - seg_times[0]) if seg_times.size else 0.0)), 3)
+                    "Start (s)": round(float(bs.get("start_t", seg_times[0])), 3)
                     if seg_times.size
                     else None,
-                    "Mean RPM": int(round(float(bs["mean_rpm"]))) if bs.get("mean_rpm") is not None else None,
-                    "Median Split (s)": round(float(np.median(seg_splits)), 3) if seg_splits.size else None,
+                    "End (s)": round(float(bs.get("end_t", seg_times[-1])), 3)
+                    if seg_times.size
+                    else None,
+                    "Duration (s)": round(
+                        float(
+                            bs.get(
+                                "duration_s",
+                                (seg_times[-1] - seg_times[0]) if seg_times.size else 0.0,
+                            )
+                        ),
+                        3,
+                    )
+                    if seg_times.size
+                    else None,
+                    "Mean RPM": int(round(float(bs["mean_rpm"])))
+                    if bs.get("mean_rpm") is not None
+                    else None,
+                    "Median Split (s)": round(float(np.median(seg_splits)), 3)
+                    if seg_splits.size
+                    else None,
                     "Cadence CV": round(float(c["cv"]), 3) if c["cv"] is not None else None,
                 }
             )
