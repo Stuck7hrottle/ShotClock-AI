@@ -14,6 +14,10 @@ def _ensure_ffmpeg() -> str:
 
 def extract_audio_wav(video_path: Path, sr: int = 48000) -> Path:
     """Extract mono WAV audio from a video using ffmpeg."""
+    # Add this check to handle direct audio input
+    if video_path.suffix.lower() == ".wav":
+        return video_path
+
     ffmpeg = _ensure_ffmpeg()
     out = video_path.with_suffix(".rof.wav")
     cmd = [

@@ -20,7 +20,7 @@ app = typer.Typer(add_completion=False, help="Rate-of-fire estimation from video
 
 @app.command()
 def detect(
-    video: Path = typer.Argument(..., exists=True, readable=True, help="Input video file."),
+    input_path: Path = typer.Argument(..., exists=True, readable=True, help="Input video file."),
     out: Path = typer.Option(Path("results.json"), help="Output JSON report path."),
     csv: Optional[Path] = typer.Option(None, help="Optional CSV export path."),
     plot: Optional[Path] = typer.Option(None, help="Optional waveform plot PNG path."),
@@ -43,7 +43,7 @@ def detect(
     burst_gap_ms: int = typer.Option(250, help="Gap threshold for new burst segmentation."),
 ):
     """Detect shot events and compute ROF."""
-    wav_path = extract_audio_wav(video)
+    wav_path = extract_audio_wav(input_path)
 
     audio_events = detect_shots_audio(
         wav_path,
@@ -53,10 +53,12 @@ def detect(
         environment=environment,
     )
 
+    # Disable vision confirmation automatically for audio files
+    is_audio = input_path.suffix.lower() == ".wav"
     video_events = None
-    if not no_vision and (roi is not None or roi_interactive):
+    if not no_vision and not is_audio and (roi is not None or roi_interactive):
         video_events = confirm_shots_with_flash(
-            video_path=video,
+            video_path=input_path,
             audio_events=audio_events,
             roi=roi,
             roi_interactive=roi_interactive,
@@ -69,7 +71,7 @@ def detect(
     burst_summary = summarize_bursts([e["t"] for e in fused], bursts)
 
     report = {
-        "input": {"video": str(video), "audio_wav": str(wav_path)},
+        "input": {"video": str(input_path), "audio_wav": str(wav_path)},
         "params": {
             "environment": environment,
             "sensitivity": sensitivity,
@@ -101,5 +103,5 @@ def detect(
         typer.echo(f"Wrote {plot}")
 
     if annotate:
-        annotate_video_with_events(video, fused, annotate)
+        annotate_video_with_events(input_path, fused, annotate)
         typer.echo(f"Wrote {annotate}")
