@@ -74,8 +74,8 @@ def _mad_threshold(onset: np.ndarray, k: float) -> tuple[float, float, float]:
 def detect_shots_audio(
     wav_path: Path,
     *,
-    sensitivity: float = 0.5,
-    min_separation_ms: int = 35,
+    sensitivity: float = 0.4,
+    min_separation_ms: int = 65,
     echo_window_ms: int = 60,
     environment: str = "auto",
 ) -> List[Dict]:
@@ -128,6 +128,9 @@ def detect_shots_audio(
         score += min(1.0, (cf / 10.0)) * (0.6 if not clipped else 0.3)
         score += min(1.0, (kurt / 50.0)) * 0.4
         score = float(np.clip(score, 0.0, 1.0))
+
+        if score <0.20:
+            continue
 
         events.append(
             {
