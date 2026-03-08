@@ -37,10 +37,10 @@ def detect(
         0.5, help="Detection sensitivity (0.1 to 1.0). Higher => more detections."
     ),
     min_separation_ms: int = typer.Option(
-        35, help="Minimum time between shots to avoid double counts."
+        50, help="Minimum time between shots to avoid double counts."
     ),
-    echo_window_ms: int = typer.Option(60, help="Cluster/merge window to suppress indoor echoes."),
-    burst_gap_ms: int = typer.Option(400, help="Gap threshold for new burst segmentation."),
+    echo_window_ms: int = typer.Option(45, help="Cluster/merge window to suppress indoor echoes."),
+    burst_gap_ms: int = typer.Option(250, help="Gap threshold for new burst segmentation."),
 ):
     """Detect shot events and compute ROF."""
     wav_path = extract_audio_wav(video)

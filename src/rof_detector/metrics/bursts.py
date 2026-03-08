@@ -4,7 +4,7 @@ from typing import List, Dict
 import numpy as np
 
 
-def segment_bursts(times_s: List[float], burst_gap_s: float = 0.4) -> List[Dict]:
+def segment_bursts(times_s: List[float], burst_gap_s: float = 0.25) -> List[Dict]:
     times = np.array(times_s, dtype=float)
     if times.size == 0:
         return []

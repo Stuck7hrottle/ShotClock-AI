@@ -22,6 +22,25 @@ st.title("🎯 ShotClock AI: Rate of Fire Analyzer")
 st.write("Upload a video to detect shots (audio-first) and compute splits / ROF.")
 
 
+def parse_roi(roi_str: str) -> tuple[int, int, int, int] | None:
+    roi_str = roi_str.strip()
+    if not roi_str:
+        return None
+
+    try:
+        parts = [int(p.strip()) for p in roi_str.split(",")]
+        if len(parts) != 4:
+            return None
+
+        x, y, w, h = parts
+        if w <= 0 or h <= 0:
+            return None
+
+        return x, y, w, h
+    except Exception:
+        return None
+
+
 def plot_waveform_window(
     wav_path: Path, events: list[dict], center_s: float, width_s: float
 ) -> None:
@@ -61,7 +80,7 @@ def plot_waveform_window(
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Amplitude")
     ax.set_title(f"Waveform ({start_s:.2f}s to {end_s:.2f}s)")
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width="stretch")
 
 
 def cadence_stats_from_splits(splits: np.ndarray) -> dict:
@@ -84,18 +103,39 @@ def cadence_stats_from_splits(splits: np.ndarray) -> dict:
 with st.sidebar:
     st.header("Detection Settings")
     environment = st.selectbox("Environment", ["auto", "indoor", "outdoor"], index=0)
-    sensitivity = st.slider("Sensitivity", min_value=0.1, max_value=1.0, value=0.5, step=0.05)
-    min_sep_ms = st.number_input(
-        "Min separation (ms)", min_value=10, max_value=200, value=35, step=5
+
+    sensitivity = st.slider(
+        "Sensitivity",
+        min_value=0.1,
+        max_value=1.0,
+        value=0.45,
+        step=0.05,
     )
+
+    min_sep_ms = st.number_input(
+        "Min separation (ms)",
+        min_value=10,
+        max_value=200,
+        value=50,
+        step=5,
+    )
+
     echo_ms = st.number_input(
-        "Echo merge window (ms)", min_value=0, max_value=200, value=60, step=5
+        "Echo merge window (ms)",
+        min_value=0,
+        max_value=200,
+        value=45,
+        step=5,
     )
 
     st.divider()
     st.header("Burst Settings")
     burst_gap_ms = st.number_input(
-        "Burst gap (ms)", min_value=50, max_value=2000, value=400, step=50
+        "Burst gap (ms)",
+        min_value=50,
+        max_value=2000,
+        value=250,
+        step=50,
     )
     st.caption("If the gap between shots exceeds this, a new burst starts.")
 
@@ -103,8 +143,13 @@ with st.sidebar:
     st.header("Vision Confirmation (optional)")
     use_vision = st.checkbox("Enable muzzle-flash confirmation", value=False)
     roi_str = st.text_input('ROI "x,y,w,h" (recommended)', value="")
-    roi_interactive = st.checkbox("Pick ROI interactively (desktop)", value=False)
-    st.caption("Vision requires opencv-python installed (pip install -e '.[dev,ui,video]').")
+
+    # Disable desktop OpenCV ROI picker in Streamlit/server environments
+    roi_interactive = False
+    st.caption(
+        "Interactive OpenCV ROI picking is disabled in the web app because it "
+        "requires a desktop GUI. Enter ROI manually as x,y,w,h instead."
+    )
 
     st.divider()
     st.header("Waveform View")
@@ -142,16 +187,24 @@ if uploaded_file:
             )
 
             video_events = None
-            if use_vision and (roi_str.strip() or roi_interactive):
-                try:
-                    video_events = confirm_shots_with_flash(
-                        video_path=tmp_video,
-                        audio_events=audio_events,
-                        roi=roi_str.strip() if roi_str.strip() else None,
-                        roi_interactive=bool(roi_interactive),
+            roi_tuple = parse_roi(roi_str)
+
+            if use_vision:
+                if roi_tuple is None:
+                    st.info(
+                        'Vision confirmation is enabled, but ROI is missing or invalid. '
+                        'Use format: x,y,w,h'
                     )
-                except Exception as e:
-                    st.warning(f"Vision confirmation unavailable: {e}")
+                else:
+                    try:
+                        video_events = confirm_shots_with_flash(
+                            video_path=tmp_video,
+                            audio_events=audio_events,
+                            roi=",".join(str(v) for v in roi_tuple),
+                            roi_interactive=False,
+                        )
+                    except Exception as e:
+                        st.warning(f"Vision confirmation unavailable: {e}")
 
             fused = fuse_scores(audio_events, video_events)
             times = [e["t"] for e in fused]
