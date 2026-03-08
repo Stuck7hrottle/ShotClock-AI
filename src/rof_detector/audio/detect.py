@@ -245,9 +245,9 @@ def _cleanup_burst_structure(
 def detect_shots_audio(
     wav_path: Path,
     *,
-    sensitivity: float = 0.45,
-    min_separation_ms: int = 50,
-    echo_window_ms: int = 45,
+    sensitivity: float = 0.48,
+    min_separation_ms: int = 35,
+    echo_window_ms: int = 30,
     environment: str = "auto",
 ) -> List[Dict]:
     """Return list of audio events: {t, audio_score, audio_features}."""
@@ -298,12 +298,24 @@ def detect_shots_audio(
         clipped = is_clipped(w)
 
         score = 0.0
-        score += min(1.0, (cf / 10.0)) * (0.6 if not clipped else 0.3)
-        score += min(1.0, (kurt / 50.0)) * 0.4
+        score += min(1.0, (cf / 10.0)) * (0.52 if not clipped else 0.24)
+        score += min(1.0, (kurt / 50.0)) * 0.30
 
         peak_prom = float(prominences[j]) if j < len(prominences) else 0.0
+        peak_height = float(heights[j]) if j < len(heights) else 0.0
+
         prom_ratio = peak_prom / max(prom, 1e-6)
-        score += min(0.12, max(0.0, prom_ratio - 1.0) * 0.06)
+        height_ratio = peak_height / max(thr, 1e-6)
+
+        score += min(0.22, max(0.0, prom_ratio - 1.0) * 0.10)
+        score += min(0.14, max(0.0, height_ratio - 1.0) * 0.05)
+
+        # Penalize weak/transient nuisance events that barely clear threshold.
+        if prom_ratio < 1.18:
+            score -= 0.08
+        if height_ratio < 1.10:
+            score -= 0.05
+
         score = float(np.clip(score, 0.0, 1.0))
 
         event = {
