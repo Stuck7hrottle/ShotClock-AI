@@ -192,8 +192,8 @@ if uploaded_file:
             if use_vision:
                 if roi_tuple is None:
                     st.info(
-                        'Vision confirmation is enabled, but ROI is missing or invalid. '
-                        'Use format: x,y,w,h'
+                        "Vision confirmation is enabled, but ROI is missing or invalid. "
+                        "Use format: x,y,w,h"
                     )
                 else:
                     try:

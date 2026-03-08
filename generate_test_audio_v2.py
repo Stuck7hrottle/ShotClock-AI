@@ -49,7 +49,9 @@ def one_pole_lowpass(x: np.ndarray, cutoff_hz: float, sr: int = SR) -> np.ndarra
     return y
 
 
-def bandpass_noise(duration_s: float, low_hz: float, high_hz: float, sr: int = SR, scale: float = 1.0) -> np.ndarray:
+def bandpass_noise(
+    duration_s: float, low_hz: float, high_hz: float, sr: int = SR, scale: float = 1.0
+) -> np.ndarray:
     n = int(duration_s * sr)
     x = RNG.normal(0.0, 1.0, n).astype(np.float32)
     b, a = butter(4, [low_hz / (sr / 2), high_hz / (sr / 2)], btype="band")
@@ -57,7 +59,9 @@ def bandpass_noise(duration_s: float, low_hz: float, high_hz: float, sr: int = S
     return y * scale
 
 
-def colored_noise(duration_s: float, color: str = "white", sr: int = SR, scale: float = 1.0) -> np.ndarray:
+def colored_noise(
+    duration_s: float, color: str = "white", sr: int = SR, scale: float = 1.0
+) -> np.ndarray:
     n = int(duration_s * sr)
     white = RNG.normal(0.0, 1.0, n).astype(np.float32)
 
@@ -87,7 +91,9 @@ def colored_noise(duration_s: float, color: str = "white", sr: int = SR, scale: 
 
 
 # ---------- Shot / nuisance synthesis ----------
-def generate_shot_impulse(profile: str = "crack", duration_s: float = 0.11, sr: int = SR) -> np.ndarray:
+def generate_shot_impulse(
+    profile: str = "crack", duration_s: float = 0.11, sr: int = SR
+) -> np.ndarray:
     t = np.linspace(0, duration_s, int(sr * duration_s), endpoint=False, dtype=np.float32)
 
     if profile == "crack":
@@ -185,7 +191,16 @@ def render_scenario(
                 echo = one_pole_lowpass(clip, lp_cutoff_hz, sr)
                 echo = apply_fade(echo, fade_ms=1.0, sr=sr)
                 add_clip(audio, echo, echo_time, amp * attenuation, sr)
-                events.append(Event(echo_time, "echo", amp * attenuation, profile, parent_index=idx, note=f"lp={lp_cutoff_hz}Hz"))
+                events.append(
+                    Event(
+                        echo_time,
+                        "echo",
+                        amp * attenuation,
+                        profile,
+                        parent_index=idx,
+                        note=f"lp={lp_cutoff_hz}Hz",
+                    )
+                )
 
     if interference:
         for t_s, amp, profile in interference:
@@ -233,133 +248,224 @@ def build_scenarios(out_dir: Path) -> list[dict]:
 
     scenarios = []
 
-    scenarios.append({
-        "name": "01_steady_600_varied_profiles.wav",
-        "shot_times": repeating(0.5, 0.1, 10),
-        "shot_profiles": ["crack", "thump", "crack", "clipped", "crack", "distant", "crack", "thump", "reverb", "crack"],
-        "shot_amplitudes": [0.82, 0.76, 0.83, 0.8, 0.78, 0.7, 0.84, 0.79, 0.75, 0.81],
-        "base_noise": ("pink", 0.012),
-    })
+    scenarios.append(
+        {
+            "name": "01_steady_600_varied_profiles.wav",
+            "shot_times": repeating(0.5, 0.1, 10),
+            "shot_profiles": [
+                "crack",
+                "thump",
+                "crack",
+                "clipped",
+                "crack",
+                "distant",
+                "crack",
+                "thump",
+                "reverb",
+                "crack",
+            ],
+            "shot_amplitudes": [0.82, 0.76, 0.83, 0.8, 0.78, 0.7, 0.84, 0.79, 0.75, 0.81],
+            "base_noise": ("pink", 0.012),
+        }
+    )
 
-    scenarios.append({
-        "name": "02_fast_1000_mixed.wav",
-        "shot_times": repeating(0.5, 0.06, 15),
-        "shot_profiles": ["crack", "clipped", "crack", "crack", "thump"] * 3,
-        "shot_amplitudes": [0.78 + 0.05 * np.sin(i) for i in range(15)],
-        "base_noise": ("pink", 0.016),
-    })
+    scenarios.append(
+        {
+            "name": "02_fast_1000_mixed.wav",
+            "shot_times": repeating(0.5, 0.06, 15),
+            "shot_profiles": ["crack", "clipped", "crack", "crack", "thump"] * 3,
+            "shot_amplitudes": [0.78 + 0.05 * np.sin(i) for i in range(15)],
+            "base_noise": ("pink", 0.016),
+        }
+    )
 
-    scenarios.append({
-        "name": "03_two_bursts_hvac.wav",
-        "shot_times": repeating(0.5, 0.1, 5) + repeating(1.5, 0.1, 5),
-        "shot_profiles": ["crack", "crack", "thump", "crack", "distant"] * 2,
-        "base_noise": ("hvac", 0.028),
-    })
+    scenarios.append(
+        {
+            "name": "03_two_bursts_hvac.wav",
+            "shot_times": repeating(0.5, 0.1, 5) + repeating(1.5, 0.1, 5),
+            "shot_profiles": ["crack", "crack", "thump", "crack", "distant"] * 2,
+            "base_noise": ("hvac", 0.028),
+        }
+    )
 
-    scenarios.append({
-        "name": "04_jittery_cadence_varied.wav",
-        "shot_times": [0.5, 0.618, 0.703, 0.846, 0.927, 1.056],
-        "shot_profiles": ["crack", "distant", "crack", "clipped", "reverb", "crack"],
-        "shot_amplitudes": [0.82, 0.68, 0.77, 0.75, 0.7, 0.79],
-        "base_noise": ("pink", 0.014),
-    })
+    scenarios.append(
+        {
+            "name": "04_jittery_cadence_varied.wav",
+            "shot_times": [0.5, 0.618, 0.703, 0.846, 0.927, 1.056],
+            "shot_profiles": ["crack", "distant", "crack", "clipped", "reverb", "crack"],
+            "shot_amplitudes": [0.82, 0.68, 0.77, 0.75, 0.7, 0.79],
+            "base_noise": ("pink", 0.014),
+        }
+    )
 
-    scenarios.append({
-        "name": "05_interference_and_clicks.wav",
-        "shot_times": repeating(0.5, 0.1, 10),
-        "shot_profiles": ["crack"] * 10,
-        "base_noise": ("pink", 0.02),
-        "interference": [(0.548, 0.28, "distant"), (0.653, 0.2, "thump"), (0.756, 0.24, "reverb")],
-        "nuisance": [(0.44, 0.32, "metal_click"), (1.11, 0.28, "speech_pop")],
-    })
+    scenarios.append(
+        {
+            "name": "05_interference_and_clicks.wav",
+            "shot_times": repeating(0.5, 0.1, 10),
+            "shot_profiles": ["crack"] * 10,
+            "base_noise": ("pink", 0.02),
+            "interference": [
+                (0.548, 0.28, "distant"),
+                (0.653, 0.2, "thump"),
+                (0.756, 0.24, "reverb"),
+            ],
+            "nuisance": [(0.44, 0.32, "metal_click"), (1.11, 0.28, "speech_pop")],
+        }
+    )
 
     echo_chain = [(24.0, 0.24, 3200.0), (41.0, 0.16, 2100.0), (67.0, 0.10, 1700.0)]
-    scenarios.append({
-        "name": "06_echo_chamber_filtered.wav",
-        "shot_times": repeating(0.5, 0.15, 5),
-        "shot_profiles": ["crack", "reverb", "crack", "clipped", "crack"],
-        "echo_chains": [echo_chain] * 5,
-        "base_noise": ("pink", 0.015),
-    })
+    scenarios.append(
+        {
+            "name": "06_echo_chamber_filtered.wav",
+            "shot_times": repeating(0.5, 0.15, 5),
+            "shot_profiles": ["crack", "reverb", "crack", "clipped", "crack"],
+            "echo_chains": [echo_chain] * 5,
+            "base_noise": ("pink", 0.015),
+        }
+    )
 
-    scenarios.append({
-        "name": "07_accelerating_drift.wav",
-        "shot_times": [0.5, 0.652, 0.781, 0.892, 0.979, 1.052, 1.115, 1.168],
-        "shot_profiles": ["distant", "crack", "crack", "thump", "crack", "clipped", "crack", "crack"],
-        "shot_amplitudes": [0.62, 0.68, 0.73, 0.75, 0.8, 0.82, 0.78, 0.76],
-        "base_noise": ("hvac", 0.022),
-    })
+    scenarios.append(
+        {
+            "name": "07_accelerating_drift.wav",
+            "shot_times": [0.5, 0.652, 0.781, 0.892, 0.979, 1.052, 1.115, 1.168],
+            "shot_profiles": [
+                "distant",
+                "crack",
+                "crack",
+                "thump",
+                "crack",
+                "clipped",
+                "crack",
+                "crack",
+            ],
+            "shot_amplitudes": [0.62, 0.68, 0.73, 0.75, 0.8, 0.82, 0.78, 0.76],
+            "base_noise": ("hvac", 0.022),
+        }
+    )
 
-    scenarios.append({
-        "name": "08_slow_fire_with_bumps.wav",
-        "shot_times": [0.5, 2.0, 3.5, 5.0],
-        "shot_profiles": ["thump", "crack", "distant", "reverb"],
-        "base_noise": ("brown", 0.018),
-        "nuisance": [(1.1, 0.35, "mic_bump"), (4.2, 0.22, "door_thump")],
-    })
+    scenarios.append(
+        {
+            "name": "08_slow_fire_with_bumps.wav",
+            "shot_times": [0.5, 2.0, 3.5, 5.0],
+            "shot_profiles": ["thump", "crack", "distant", "reverb"],
+            "base_noise": ("brown", 0.018),
+            "nuisance": [(1.1, 0.35, "mic_bump"), (4.2, 0.22, "door_thump")],
+        }
+    )
 
-    scenarios.append({
-        "name": "09_double_taps_boundary.wav",
-        "shot_times": [0.5, 0.54, 1.0, 1.04, 1.5, 1.54, 2.0, 2.043],
-        "shot_profiles": ["crack", "clipped", "crack", "clipped", "crack", "clipped", "distant", "crack"],
-        "shot_amplitudes": [0.82, 0.65, 0.8, 0.64, 0.81, 0.66, 0.63, 0.8],
-        "base_noise": ("pink", 0.016),
-        "nuisance": [(2.3, 0.18, "metal_click")],
-    })
+    scenarios.append(
+        {
+            "name": "09_double_taps_boundary.wav",
+            "shot_times": [0.5, 0.54, 1.0, 1.04, 1.5, 1.54, 2.0, 2.043],
+            "shot_profiles": [
+                "crack",
+                "clipped",
+                "crack",
+                "clipped",
+                "crack",
+                "clipped",
+                "distant",
+                "crack",
+            ],
+            "shot_amplitudes": [0.82, 0.65, 0.8, 0.64, 0.81, 0.66, 0.63, 0.8],
+            "base_noise": ("pink", 0.016),
+            "nuisance": [(2.3, 0.18, "metal_click")],
+        }
+    )
 
-    scenarios.append({
-        "name": "10_noisy_env_harsh.wav",
-        "shot_times": repeating(0.5, 0.1, 10),
-        "shot_profiles": ["distant", "crack", "distant", "crack", "distant", "crack", "distant", "crack", "distant", "crack"],
-        "shot_amplitudes": [0.18, 0.22, 0.16, 0.2, 0.17, 0.21, 0.16, 0.2, 0.18, 0.22],
-        "base_noise": ("hvac", 0.08),
-        "nuisance": [
-            (0.43, 0.34, "speech_pop"),
-            (0.87, 0.29, "metal_click"),
-            (1.08, 0.31, "mic_bump"),
-            (1.36, 0.27, "door_thump"),
-        ],
-    })
+    scenarios.append(
+        {
+            "name": "10_noisy_env_harsh.wav",
+            "shot_times": repeating(0.5, 0.1, 10),
+            "shot_profiles": [
+                "distant",
+                "crack",
+                "distant",
+                "crack",
+                "distant",
+                "crack",
+                "distant",
+                "crack",
+                "distant",
+                "crack",
+            ],
+            "shot_amplitudes": [0.18, 0.22, 0.16, 0.2, 0.17, 0.21, 0.16, 0.2, 0.18, 0.22],
+            "base_noise": ("hvac", 0.08),
+            "nuisance": [
+                (0.43, 0.34, "speech_pop"),
+                (0.87, 0.29, "metal_click"),
+                (1.08, 0.31, "mic_bump"),
+                (1.36, 0.27, "door_thump"),
+            ],
+        }
+    )
 
-    scenarios.append({
-        "name": "11_multi_burst_realistic.wav",
-        "shot_times": repeating(0.5, 0.1, 3) + repeating(1.5, 0.1, 3) + repeating(2.5, 0.1, 3),
-        "shot_profiles": ["crack", "crack", "thump", "distant", "crack", "reverb", "clipped", "crack", "distant"],
-        "base_noise": ("pink", 0.015),
-        "nuisance": [(1.25, 0.2, "speech_pop")],
-    })
+    scenarios.append(
+        {
+            "name": "11_multi_burst_realistic.wav",
+            "shot_times": repeating(0.5, 0.1, 3) + repeating(1.5, 0.1, 3) + repeating(2.5, 0.1, 3),
+            "shot_profiles": [
+                "crack",
+                "crack",
+                "thump",
+                "distant",
+                "crack",
+                "reverb",
+                "clipped",
+                "crack",
+                "distant",
+            ],
+            "base_noise": ("pink", 0.015),
+            "nuisance": [(1.25, 0.2, "speech_pop")],
+        }
+    )
 
-    scenarios.append({
-        "name": "12_extreme_1200_edge.wav",
-        "shot_times": repeating(0.5, 0.05, 20),
-        "shot_profiles": ["crack", "clipped", "crack", "thump"] * 5,
-        "shot_amplitudes": [0.75 + 0.05 * np.cos(i / 2) for i in range(20)],
-        "base_noise": ("pink", 0.018),
-    })
+    scenarios.append(
+        {
+            "name": "12_extreme_1200_edge.wav",
+            "shot_times": repeating(0.5, 0.05, 20),
+            "shot_profiles": ["crack", "clipped", "crack", "thump"] * 5,
+            "shot_amplitudes": [0.75 + 0.05 * np.cos(i / 2) for i in range(20)],
+            "base_noise": ("pink", 0.018),
+        }
+    )
 
-    scenarios.append({
-        "name": "13_echo_vs_doubletap_ambiguous.wav",
-        "shot_times": [0.5, 0.85, 1.2, 1.24, 1.6],
-        "shot_profiles": ["crack", "reverb", "crack", "clipped", "crack"],
-        "echo_chains": [
-            [(38.0, 0.28, 2800.0)],
-            [(34.0, 0.24, 2200.0)],
-            [],
-            [],
-            [(42.0, 0.2, 2000.0)],
-        ],
-        "base_noise": ("pink", 0.014),
-        "nuisance": [(1.02, 0.22, "metal_click")],
-    })
+    scenarios.append(
+        {
+            "name": "13_echo_vs_doubletap_ambiguous.wav",
+            "shot_times": [0.5, 0.85, 1.2, 1.24, 1.6],
+            "shot_profiles": ["crack", "reverb", "crack", "clipped", "crack"],
+            "echo_chains": [
+                [(38.0, 0.28, 2800.0)],
+                [(34.0, 0.24, 2200.0)],
+                [],
+                [],
+                [(42.0, 0.2, 2000.0)],
+            ],
+            "base_noise": ("pink", 0.014),
+            "nuisance": [(1.02, 0.22, "metal_click")],
+        }
+    )
 
-    scenarios.append({
-        "name": "14_threshold_walkaway.wav",
-        "shot_times": repeating(0.5, 0.11, 8),
-        "shot_profiles": ["distant", "distant", "crack", "distant", "crack", "distant", "crack", "distant"],
-        "shot_amplitudes": [0.28, 0.24, 0.21, 0.19, 0.17, 0.15, 0.14, 0.13],
-        "base_noise": ("hvac", 0.05),
-        "nuisance": [(0.95, 0.24, "speech_pop"), (1.44, 0.22, "mic_bump")],
-    })
+    scenarios.append(
+        {
+            "name": "14_threshold_walkaway.wav",
+            "shot_times": repeating(0.5, 0.11, 8),
+            "shot_profiles": [
+                "distant",
+                "distant",
+                "crack",
+                "distant",
+                "crack",
+                "distant",
+                "crack",
+                "distant",
+            ],
+            "shot_amplitudes": [0.28, 0.24, 0.21, 0.19, 0.17, 0.15, 0.14, 0.13],
+            "base_noise": ("hvac", 0.05),
+            "nuisance": [(0.95, 0.24, "speech_pop"), (1.44, 0.22, "mic_bump")],
+        }
+    )
 
     for config in scenarios:
         out_wav = out_dir / config["name"]

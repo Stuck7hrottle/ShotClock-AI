@@ -231,9 +231,8 @@ def _cleanup_burst_structure(
                 break
 
         # Keep only unusually strong singletons that are attached to a nearby real burst.
-        near_real_burst = (
-            (prev_multi_gap is not None and prev_multi_gap <= 0.18)
-            or (next_multi_gap is not None and next_multi_gap <= 0.18)
+        near_real_burst = (prev_multi_gap is not None and prev_multi_gap <= 0.18) or (
+            next_multi_gap is not None and next_multi_gap <= 0.18
         )
         if strength >= 0.92 and near_real_burst:
             cleaned.append(e)

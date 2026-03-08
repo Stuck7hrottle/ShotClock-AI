@@ -153,12 +153,17 @@ def print_table(rows: list[dict[str, Any]]) -> None:
         widths["Rec%"] = max(widths["Rec%"], len(f"{r['recall_pct']:.1f}"))
         widths["F1%"] = max(widths["F1%"], len(f"{r['f1_pct']:.1f}"))
         widths["MeanErrMs"] = max(widths["MeanErrMs"], len(fmt_ms(r["mean_abs_err_s"])))
-        widths["Avg RPM"] = max(widths["Avg RPM"], len("-" if r["avg_rpm"] is None else f"{r['avg_rpm']:.1f}"))
+        widths["Avg RPM"] = max(
+            widths["Avg RPM"], len("-" if r["avg_rpm"] is None else f"{r['avg_rpm']:.1f}")
+        )
         widths["Bursts"] = max(widths["Bursts"], len(str(r["burst_count"])))
         widths["Status"] = max(widths["Status"], len(r["status"]))
 
     def render_row(cells: dict[str, str]) -> str:
-        return "  ".join(str(cells[h]).rjust(widths[h]) if h != "Scenario" else str(cells[h]).ljust(widths[h]) for h in headers)
+        return "  ".join(
+            str(cells[h]).rjust(widths[h]) if h != "Scenario" else str(cells[h]).ljust(widths[h])
+            for h in headers
+        )
 
     print(render_row({h: h for h in headers}))
     print(render_row({h: "-" * widths[h] for h in headers}))
@@ -185,17 +190,32 @@ def print_table(rows: list[dict[str, Any]]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Batch-evaluate ShotClock-AI results against ground_truth.json")
-    parser.add_argument("--audio-dir", default="test_audio_v2", help="Directory containing generated WAV files")
-    parser.add_argument("--truth", default="test_audio_v2/ground_truth.json", help="Path to ground_truth.json")
+    parser = argparse.ArgumentParser(
+        description="Batch-evaluate ShotClock-AI results against ground_truth.json"
+    )
+    parser.add_argument(
+        "--audio-dir", default="test_audio_v2", help="Directory containing generated WAV files"
+    )
+    parser.add_argument(
+        "--truth", default="test_audio_v2/ground_truth.json", help="Path to ground_truth.json"
+    )
     parser.add_argument("--rof-cmd", default="rof", help="CLI executable to invoke")
     parser.add_argument("--environment", default="auto", choices=["auto", "indoor", "outdoor"])
     parser.add_argument("--sensitivity", type=float, default=0.5)
     parser.add_argument("--min-separation-ms", type=int, default=50)
     parser.add_argument("--echo-window-ms", type=int, default=45)
     parser.add_argument("--burst-gap-ms", type=int, default=250)
-    parser.add_argument("--match-tolerance-ms", type=float, default=35.0, help="Max timing error for a true-positive match")
-    parser.add_argument("--save-json", default="batch_analysis_v2_results.json", help="Where to save the detailed evaluation JSON")
+    parser.add_argument(
+        "--match-tolerance-ms",
+        type=float,
+        default=35.0,
+        help="Max timing error for a true-positive match",
+    )
+    parser.add_argument(
+        "--save-json",
+        default="batch_analysis_v2_results.json",
+        help="Where to save the detailed evaluation JSON",
+    )
     args = parser.parse_args()
 
     audio_dir = Path(args.audio_dir)
@@ -236,7 +256,11 @@ def main() -> int:
         precision = match.tp / (match.tp + match.fp) if (match.tp + match.fp) else 0.0
         recall = match.tp / (match.tp + match.fn) if (match.tp + match.fn) else 0.0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
-        mean_abs_err = mean(abs(det - exp) for exp, det in match.matched_pairs) if match.matched_pairs else None
+        mean_abs_err = (
+            mean(abs(det - exp) for exp, det in match.matched_pairs)
+            if match.matched_pairs
+            else None
+        )
 
         if match.fp == 0 and match.fn == 0:
             status = "✅ Exact"
