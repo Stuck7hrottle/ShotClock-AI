@@ -1,48 +1,76 @@
+
 # ShotClock-AI
 
-**ShotClock-AI** is a high-precision acoustic rate-of-fire (ROF) analysis tool designed to detect impulsive events such as firearm shots from **audio or video sources**.
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
+![Status](https://img.shields.io/badge/status-active-success)
 
-It extracts shot timestamps, groups bursts, and calculates rate-of-fire statistics while suppressing echoes and acoustic artifacts.
+**ShotClock‑AI** is a high‑precision acoustic **rate‑of‑fire (ROF) analysis tool** designed to detect impulsive events such as firearm shots from **audio or video sources**.
 
-The system is designed around **robust signal-processing techniques** rather than simple peak detection, enabling it to operate reliably in challenging acoustic environments.
+The system extracts shot timestamps, groups bursts, and calculates detailed rate‑of‑fire statistics while suppressing echoes and acoustic artifacts.
+
+The detector is built around **robust signal‑processing techniques rather than simple peak detection**, allowing it to perform reliably in challenging acoustic environments.
 
 ---
 
 # Features
 
-### Shot Detection
+## Shot Detection
 
-ShotClock-AI identifies impulsive acoustic events using multiple signal features:
+ShotClock‑AI identifies impulsive acoustic events using multiple signal features:
 
-* Adaptive amplitude thresholding
-* Crest factor analysis
-* Kurtosis analysis
-* Peak prominence detection
-* Echo suppression
+- Adaptive amplitude thresholding
+- Crest factor analysis
+- Kurtosis analysis
+- Peak prominence detection
+- Echo suppression
 
-### Burst Detection
+These techniques allow reliable operation even with:
 
-Automatically groups shots into bursts based on timing gaps.
+- echoes
+- background noise
+- close‑interval shots
+- microphone artifacts
 
-### ROF Statistics
+---
 
-Computes detailed rate-of-fire metrics:
+## Burst Detection
 
-* Mean RPM
-* Median RPM
-* Percentile RPM
-* Maximum RPM
-* Burst-level ROF statistics
+Detected shots are automatically grouped into **bursts** based on timing gaps between events.
 
-### Robustness Improvements
+Burst grouping allows the system to distinguish between:
 
-The detector includes specialized logic to handle:
+- semi‑automatic fire
+- controlled bursts
+- sustained automatic fire
 
-* Echo reflections
-* Close-interval shots (double taps)
-* Mechanical clicks
-* Microphone bumps
-* Background noise
+---
+
+## ROF Statistics
+
+ShotClock‑AI computes detailed rate‑of‑fire metrics including:
+
+- Mean RPM
+- Median RPM
+- Percentile RPM
+- Maximum RPM
+- Burst‑level ROF statistics
+- Split times between shots
+- Cadence consistency metrics
+
+---
+
+## Robustness Improvements
+
+The detector includes logic to handle difficult recording conditions:
+
+- Echo reflections
+- Close‑interval shots (double taps)
+- Mechanical clicks
+- Microphone bumps
+- Background noise
+- Variable microphone gain
 
 ---
 
@@ -96,7 +124,7 @@ Save JSON results:
 rof input.wav --out results.json
 ```
 
-Export CSV:
+Export CSV results:
 
 ```bash
 rof input.wav --csv results.csv
@@ -112,28 +140,25 @@ rof input.wav --plot waveform.png
 
 # CLI Parameters
 
-| Parameter             | Description                        |
-| --------------------- | ---------------------------------- |
-| `--sensitivity`       | Detection sensitivity              |
+| Parameter | Description |
+|----------|-------------|
+| `--sensitivity` | Detection sensitivity |
 | `--min-separation-ms` | Minimum allowed time between shots |
-| `--echo-window-ms`    | Echo suppression window            |
-| `--burst-gap-ms`      | Gap used to split bursts           |
-| `--environment`       | Optional preset tuning             |
+| `--echo-window-ms` | Echo suppression window |
+| `--burst-gap-ms` | Gap used to split bursts |
+| `--environment` | Optional preset tuning |
 
 Example:
 
 ```bash
-rof audio.wav \
-    --sensitivity 0.48 \
-    --min-separation-ms 35 \
-    --echo-window-ms 30
+rof audio.wav     --sensitivity 0.48     --min-separation-ms 35     --echo-window-ms 30
 ```
 
 ---
 
 # Default Detection Tuning
 
-Production defaults:
+Recommended production defaults:
 
 ```
 sensitivity = 0.48
@@ -142,13 +167,13 @@ echo_window_ms = 30
 burst_gap_ms = 250
 ```
 
-These values were derived using the synthetic regression dataset included with the project.
+These values were derived using the **synthetic regression dataset** included with the project.
 
 They balance:
 
-* echo rejection
-* close-shot detection
-* transient noise suppression
+- echo rejection
+- close‑shot detection
+- transient noise suppression
 
 ---
 
@@ -169,7 +194,7 @@ Example JSON output:
     "mean_rpm": 720.4,
     "max_rpm": 1040.2
   },
-  "bursts": [...]
+  "bursts": []
 }
 ```
 
@@ -177,23 +202,120 @@ Example JSON output:
 
 # Streamlit Web Interface
 
-ShotClock-AI includes an optional **Streamlit interface** for interactive analysis.
+ShotClock‑AI includes an optional **interactive Streamlit interface** for visual inspection and manual verification of detections.
 
-Run the web UI:
+Run the interface:
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-The interface allows you to:
+Open your browser:
 
-* Upload audio or video files
-* Run detection interactively
-* Visualize detected shots
-* Display ROF statistics
-* Inspect waveform plots
+```
+http://localhost:8501
+```
 
-This interface is useful for **manual verification and quick analysis** without using the CLI.
+(or your configured reverse‑proxy domain).
+
+---
+
+# Interactive Analysis Workflow
+
+Typical workflow:
+
+1. Upload a **video or audio file**
+2. The detector runs automatically
+3. Choose an **analysis target**
+4. Inspect the waveform
+5. Correct detections if necessary
+6. Export results
+
+The interface is designed for **manual verification and detailed analysis** of complex recordings.
+
+---
+
+# Analysis Target Modes
+
+### Full Recording
+
+Analyze the entire audio track.
+
+### Detected Burst
+
+Select a burst detected by the algorithm.
+
+Optional **burst padding** prevents clipping the first or last shot.
+
+### Manual Window
+
+Select any arbitrary time window in the recording.
+
+Useful when:
+
+- the detector misses bursts
+- noise events confuse burst detection
+- analyzing a specific time segment
+
+---
+
+# Waveform Inspection
+
+The interface includes a waveform viewer showing:
+
+- detected shot timestamps
+- burst groupings
+- selected analysis window
+
+Features include:
+
+- automatic waveform zoom based on the selected burst/window
+- adjustable waveform center
+- manual zoom control
+- ability to jump directly to detected shots
+
+This allows users to visually confirm that impulses correspond to real shots.
+
+---
+
+# Manual Shot Editing
+
+Detected shots can be edited directly in the interface.
+
+Users can:
+
+- remove false positives
+- adjust timestamps
+- add missed shots
+
+After edits the system automatically recomputes:
+
+- burst grouping
+- ROF statistics
+- cadence metrics
+
+This enables precise correction in difficult acoustic environments.
+
+---
+
+# Exporting Results
+
+### CSV
+
+Shot‑level statistics including:
+
+- timestamp
+- split time
+- instantaneous RPM
+
+### JSON
+
+Full analysis report including:
+
+- detection parameters
+- burst statistics
+- ROF metrics
+- edited event list
 
 ---
 
@@ -225,7 +347,7 @@ ShotClock-AI
 
 # Tuning the Detector
 
-ShotClock-AI includes tools for **systematic tuning and regression testing**.
+ShotClock‑AI includes tools for **systematic tuning and regression testing**.
 
 Two scripts generate synthetic audio datasets:
 
@@ -234,12 +356,12 @@ generate_test_audio.py
 generate_test_audio_v2.py
 ```
 
-The second version produces more realistic conditions:
+The advanced generator produces:
 
-* filtered echoes
-* impulse variation
-* nuisance transients
-* environmental noise
+- filtered echoes
+- impulse variation
+- nuisance transients
+- environmental noise
 
 ---
 
@@ -292,21 +414,21 @@ Recall: 97.6%
 F1 score: 95.0%
 ```
 
-The script also produces a detailed JSON regression report.
+The script also produces a JSON regression report.
 
 ---
 
 # Important Test Scenarios
 
-| Scenario        | Purpose                  |
-| --------------- | ------------------------ |
-| steady cadence  | baseline accuracy        |
-| fast burst      | high RPM                 |
-| echo chamber    | echo suppression         |
-| jittery cadence | irregular firing         |
-| interference    | transient noise          |
-| slow fire       | isolated shots           |
-| double taps     | close-interval detection |
+| Scenario | Purpose |
+|---------|---------|
+| steady cadence | baseline accuracy |
+| fast burst | high RPM |
+| echo chamber | echo suppression |
+| jittery cadence | irregular firing |
+| interference | transient noise |
+| slow fire | isolated shots |
+| double taps | close‑interval detection |
 
 ---
 
@@ -332,9 +454,9 @@ min_separation_ms
 echo_window_ms
 ```
 
-4. Re-run regression
+4. Re‑run regression tests
 
-Focus on these edge scenarios:
+Focus on these challenging scenarios:
 
 ```
 05_interference_and_clicks
@@ -346,35 +468,33 @@ Focus on these edge scenarios:
 
 # Performance Benchmarks
 
-Using the included synthetic regression dataset:
+Using the included regression dataset:
 
-| Metric    | Result  |
-| --------- | ------- |
+| Metric | Result |
+|------|------|
 | Precision | ~92–94% |
-| Recall    | ~97–98% |
-| F1 Score  | ~95%    |
+| Recall | ~97–98% |
+| F1 Score | ~95% |
 
 The system maintains high recall while preserving accurate burst timing and ROF statistics.
 
 ---
 
-# Real-World Audio Limitations
-
-ShotClock-AI is designed for impulsive acoustic events but performance depends on recording conditions.
+# Real‑World Audio Limitations
 
 Performance may degrade when:
 
-* microphone clipping occurs
-* heavy compression is applied to audio
-* strong mechanical impacts occur near the microphone
-* echoes arrive very close to the direct impulse
-* heavy crowd noise is present
+- microphone clipping occurs
+- heavy audio compression is applied
+- strong mechanical impacts occur near the microphone
+- echoes arrive very close to the direct impulse
+- heavy crowd noise is present
 
-For best results:
+Best practices:
 
-* use uncompressed audio
-* avoid automatic gain control
-* keep microphones within reasonable distance of the source
+- use uncompressed audio
+- avoid automatic gain control
+- keep microphones within reasonable distance
 
 ---
 
@@ -382,11 +502,11 @@ For best results:
 
 Planned improvements:
 
-* environment presets
-* improved transient classification
-* multi-channel microphone support
-* GPU-accelerated signal analysis
-* optional vision-based shot confirmation
+- environment presets
+- improved transient classification
+- multi‑channel microphone support
+- GPU‑accelerated signal analysis
+- optional vision‑based shot confirmation
 
 ---
 
@@ -396,12 +516,21 @@ Pull requests and improvements are welcome.
 
 When submitting tuning changes please include:
 
-* updated regression results
-* batch analysis output
-* explanation of parameter changes
+- updated regression results
+- batch analysis output
+- explanation of parameter changes
 
 ---
 
 # License
 
 MIT License
+
+---
+
+# UI Preview
+
+Add a screenshot or demo GIF here once available:
+
+![ShotClock UI](docs/ui_demo.png)
+
