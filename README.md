@@ -530,7 +530,6 @@ MIT License
 
 # UI Preview
 
-Add a screenshot or demo GIF here once available:
-
 ![ShotClock UI](docs/ui_demo.png)
 
+![ShotClock UI](docs/ui_demo2.png)
