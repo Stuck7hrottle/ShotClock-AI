@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Estimate rate of fire from video using audio-first shot detection with optional muzzle flash confirmation."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 authors = [{name = "Your Name"}]
 dependencies = [
   "numpy>=1.24",

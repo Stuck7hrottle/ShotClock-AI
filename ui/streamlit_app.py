@@ -11,11 +11,12 @@ from scipy.io import wavfile
 
 from rof_detector.audio.detect import detect_shots_audio
 from rof_detector.fusion.fuse import fuse_scores
-from rof_detector.io.ffmpeg import extract_audio_wav
+from rof_detector.io.ffmpeg import extract_audio_wav, validate_media_file
 from rof_detector.metrics.bursts import segment_bursts, summarize_bursts
 from rof_detector.metrics.rof import compute_rof
 from rof_detector.vision.flash_detect import confirm_shots_with_flash
 
+import re
 
 st.set_page_config(page_title="ShotClock AI", layout="wide")
 st.title("🎯 ShotClock AI: Rate of Fire Analyzer")
@@ -24,6 +25,30 @@ st.write(
     "and manually correct timestamps when needed."
 )
 
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
+ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
+
+def sanitize_filename(name: str) -> str:
+    base = Path(name).name
+    return re.sub(r"[^A-Za-z0-9._-]", "_", base)
+
+def validate_uploaded_file(uploaded_file) -> tuple[bool, str | None]:
+    if uploaded_file is None:
+        return False, "No file uploaded."
+
+    filename = sanitize_filename(uploaded_file.name or "upload")
+    suffix = Path(filename).suffix.lower()
+
+    if suffix not in ALLOWED_EXTENSIONS:
+        return False, f"Unsupported file type: {suffix or 'unknown'}"
+
+    if getattr(uploaded_file, "size", None) is not None:
+        if uploaded_file.size <= 0:
+            return False, "Uploaded file is empty."
+        if uploaded_file.size > MAX_UPLOAD_BYTES:
+            return False, "File too large. Maximum allowed size is 200 MB."
+
+    return True, None
 
 def parse_roi(roi_str: str) -> tuple[int, int, int, int] | None:
     roi_str = roi_str.strip()
@@ -291,9 +316,22 @@ with st.sidebar:
 uploaded_file = st.file_uploader("Upload Video (MP4, MOV, AVI)", type=["mp4", "mov", "avi"])
 
 if uploaded_file:
+    ok, err = validate_uploaded_file(uploaded_file)
+    if not ok:
+        st.error(err)
+        st.stop()
+
     with tempfile.TemporaryDirectory() as td:
-        tmp_video = Path(td) / "upload.mp4"
+        safe_name = sanitize_filename(uploaded_file.name or "upload.mp4")
+        suffix = Path(safe_name).suffix.lower() or ".mp4"
+        tmp_video = Path(td) / f"upload{suffix}"
         tmp_video.write_bytes(uploaded_file.getbuffer())
+
+        try:
+            validate_media_file(tmp_video)
+        except Exception as e:
+            st.error(f"Invalid or unsupported media file. Details: {e}")
+            st.stop()
 
         st.video(str(tmp_video))
 

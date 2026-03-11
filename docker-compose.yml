@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  shotclock-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shotclock-ai
+    ports:
+      - "127.0.0.1:8501:8501"
+    restart: unless-stopped
+
+    environment:
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      STREAMLIT_SERVER_MAX_UPLOAD_SIZE: "200"
+
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+
+    security_opt:
+      - no-new-privileges:true
+
+    read_only: true
+
+    volumes:
+      - streamlit_state:/home/appuser/.streamlit
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+volumes:
+  streamlit_state:
