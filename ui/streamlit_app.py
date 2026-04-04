@@ -262,7 +262,7 @@ with st.sidebar:
         "Min separation (ms)",
         min_value=10,
         max_value=200,
-        value=35,
+        value=50,
         step=5,
     )
 
@@ -270,7 +270,7 @@ with st.sidebar:
         "Echo merge window (ms)",
         min_value=0,
         max_value=200,
-        value=30,
+        value=45,
         step=5,
     )
 
