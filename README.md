@@ -109,31 +109,31 @@ rof
 Run detection on an audio file:
 
 ```bash
-rof input.wav
+rof detect input.wav
 ```
 
 Run detection on a video file:
 
 ```bash
-rof input.mp4
+rof detect input.mp4
 ```
 
 Save JSON results:
 
 ```bash
-rof input.wav --out results.json
+rof detect input.wav --out results.json
 ```
 
 Export CSV results:
 
 ```bash
-rof input.wav --csv results.csv
+rof detect input.wav --csv results.csv
 ```
 
 Generate waveform plot:
 
 ```bash
-rof input.wav --plot waveform.png
+rof detect input.wav --plot waveform.png
 ```
 
 ---
@@ -151,7 +151,7 @@ rof input.wav --plot waveform.png
 Example:
 
 ```bash
-rof audio.wav     --sensitivity 0.48     --min-separation-ms 35     --echo-window-ms 30
+rof detect audio.wav     --sensitivity 0.48     --min-separation-ms 35     --echo-window-ms 30
 ```
 
 ---
@@ -207,7 +207,7 @@ ShotClock‑AI includes an optional **interactive Streamlit interface** for visu
 Run the interface:
 
 ```bash
-streamlit run streamlit_app.py
+streamlit run ui/streamlit_app.py
 ```
 
 Open your browser:
