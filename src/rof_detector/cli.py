@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 
-from rof_detector.io.ffmpeg import extract_audio_wav
 from rof_detector.audio.detect import detect_shots_audio
-from rof_detector.vision.flash_detect import confirm_shots_with_flash
 from rof_detector.fusion.fuse import fuse_scores
-from rof_detector.metrics.rof import compute_rof
+from rof_detector.io.ffmpeg import extract_audio_wav
 from rof_detector.metrics.bursts import segment_bursts, summarize_bursts
-from rof_detector.viz.plots import plot_waveform_with_events
+from rof_detector.metrics.rof import compute_rof
+from rof_detector.vision.flash_detect import confirm_shots_with_flash
 from rof_detector.viz.annotate_video import annotate_video_with_events
+from rof_detector.viz.plots import plot_waveform_with_events
 
 app = typer.Typer(add_completion=False, help="Rate-of-fire estimation from video.")
 
@@ -22,10 +21,10 @@ app = typer.Typer(add_completion=False, help="Rate-of-fire estimation from video
 def detect(
     input_path: Path = typer.Argument(..., exists=True, readable=True, help="Input video file."),
     out: Path = typer.Option(Path("results.json"), help="Output JSON report path."),
-    csv: Optional[Path] = typer.Option(None, help="Optional CSV export path."),
-    plot: Optional[Path] = typer.Option(None, help="Optional waveform plot PNG path."),
-    annotate: Optional[Path] = typer.Option(None, help="Optional annotated video output path."),
-    roi: Optional[str] = typer.Option(
+    csv: Path | None = typer.Option(None, help="Optional CSV export path."),
+    plot: Path | None = typer.Option(None, help="Optional waveform plot PNG path."),
+    annotate: Path | None = typer.Option(None, help="Optional annotated video output path."),
+    roi: str | None = typer.Option(
         None, help='ROI "x,y,w,h" for muzzle region (video confirmation).'
     ),
     roi_interactive: bool = typer.Option(False, help="Interactively select ROI on first frame."),

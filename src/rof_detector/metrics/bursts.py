@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import List, Dict
 import numpy as np
 
 
-def segment_bursts(times_s: List[float], burst_gap_s: float = 0.25) -> List[Dict]:
+def segment_bursts(times_s: list[float], burst_gap_s: float = 0.25) -> list[dict]:
     times = np.array(times_s, dtype=float)
     if times.size == 0:
         return []
@@ -18,7 +17,7 @@ def segment_bursts(times_s: List[float], burst_gap_s: float = 0.25) -> List[Dict
     return bursts
 
 
-def summarize_bursts(times_s: List[float], bursts: List[Dict]) -> List[Dict]:
+def summarize_bursts(times_s: list[float], bursts: list[dict]) -> list[dict]:
     times = np.array(times_s, dtype=float)
     out = []
     for b in bursts:

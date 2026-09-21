@@ -1,7 +1,8 @@
-import subprocess
 import json
-import pandas as pd
+import subprocess
 from pathlib import Path
+
+import pandas as pd
 
 
 def run_batch():
@@ -12,7 +13,7 @@ def run_batch():
     summary_data = []
 
     # Get all wav files generated earlier
-    wav_files = sorted(list(test_dir.glob("*.wav")))
+    wav_files = sorted(test_dir.glob("*.wav"))
 
     print(f"🚀 Starting batch analysis of {len(wav_files)} files...\n")
 
@@ -27,7 +28,7 @@ def run_batch():
             subprocess.run(cmd, check=True, capture_output=True, text=True)
 
             # Load the result to build the summary
-            with open(output_json, "r") as f:
+            with open(output_json) as f:
                 data = json.load(f)
 
             rof_stats = data.get("rof", {})

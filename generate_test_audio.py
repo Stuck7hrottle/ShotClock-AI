@@ -1,6 +1,7 @@
+from pathlib import Path
+
 import numpy as np
 from scipy.io import wavfile
-from pathlib import Path
 
 
 def generate_shot_impulse(duration_s=0.1, sr=48000):

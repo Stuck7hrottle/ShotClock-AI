@@ -1,4 +1,5 @@
 import json
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -16,8 +17,6 @@ from rof_detector.metrics.bursts import segment_bursts, summarize_bursts
 from rof_detector.metrics.rof import compute_rof
 from rof_detector.vision.flash_detect import confirm_shots_with_flash
 
-import re
-
 st.set_page_config(page_title="ShotClock AI", layout="wide")
 st.title("🎯 ShotClock AI: Rate of Fire Analyzer")
 st.write(
@@ -28,9 +27,11 @@ st.write(
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi"}
 
+
 def sanitize_filename(name: str) -> str:
     base = Path(name).name
     return re.sub(r"[^A-Za-z0-9._-]", "_", base)
+
 
 def validate_uploaded_file(uploaded_file) -> tuple[bool, str | None]:
     if uploaded_file is None:
@@ -49,6 +50,7 @@ def validate_uploaded_file(uploaded_file) -> tuple[bool, str | None]:
             return False, "File too large. Maximum allowed size is 200 MB."
 
     return True, None
+
 
 def parse_roi(roi_str: str) -> tuple[int, int, int, int] | None:
     roi_str = roi_str.strip()
@@ -112,7 +114,7 @@ def events_to_table(events: list[dict[str, Any]]) -> pd.DataFrame:
                 "Shot #": i + 1,
                 "Timestamp (s)": round(t, 4),
                 "Split (s)": round(split, 4) if split is not None else None,
-                "Inst. RPM": int(round(inst_rpm)) if inst_rpm else None,
+                "Inst. RPM": round(inst_rpm) if inst_rpm else None,
                 "Confidence": round(float(e.get("confidence", 0.0)), 3),
                 "Audio Score": round(float(e.get("audio_score", 0.0)), 3),
                 "Video Score": (
@@ -170,7 +172,10 @@ def build_burst_options(
         end_t = float(bs.get("end_t", start_t))
         options.append(
             {
-                "label": f"Burst {i + 1}: {start_t:.2f}s – {end_t:.2f}s ({int(bs.get('n_shots', 0))} shots)",
+                "label": (
+                    f"Burst {i + 1}: {start_t:.2f}s – {end_t:.2f}s "
+                    f"({int(bs.get('n_shots', 0))} shots)"
+                ),
                 "start": start_t,
                 "end": end_t,
                 "kind": "burst",
@@ -309,7 +314,10 @@ with st.sidebar:
         min_value=1.0,
         value=10.0,
         step=1.0,
-        help="Used as the maximum width when auto zoom is enabled, or the fixed width when auto zoom is disabled.",
+        help=(
+            "Used as the maximum width when auto zoom is enabled, "
+            "or the fixed width when auto zoom is disabled."
+        ),
     )
 
 
@@ -340,7 +348,8 @@ if uploaded_file:
                 wav_path = extract_audio_wav(tmp_video)
             except Exception as e:
                 st.error(
-                    "Audio extraction failed. This project requires **ffmpeg** installed and on PATH.\n\n"
+                    "Audio extraction failed. This project requires **ffmpeg** "
+                    "installed and on PATH.\n\n"
                     "On Ubuntu/Debian:\n"
                     "```bash\nsudo apt update && sudo apt install ffmpeg\n```\n\n"
                     f"Details: {e}"
@@ -361,7 +370,8 @@ if uploaded_file:
             if use_vision:
                 if roi_tuple is None:
                     st.info(
-                        "Vision confirmation is enabled, but ROI is missing or invalid. Use format: x,y,w,h"
+                        "Vision confirmation is enabled, but ROI is missing or invalid. "
+                        "Use format: x,y,w,h"
                     )
                 else:
                     try:
@@ -481,9 +491,12 @@ if uploaded_file:
         if selected_events:
             shot_choice = st.selectbox(
                 "Jump waveform to shot #",
-                options=[0] + list(range(1, len(selected_events) + 1)),
+                options=[0, *list(range(1, len(selected_events) + 1))],
                 index=0,
-                help="Choose a shot number to center the waveform around that shot. 0 = manual center.",
+                help=(
+                    "Choose a shot number to center the waveform around that shot. "
+                    "0 = manual center."
+                ),
             )
             if shot_choice != 0:
                 wave_center = float(selected_events[shot_choice - 1]["t"])
@@ -499,8 +512,10 @@ if uploaded_file:
         )
 
         st.caption(
-            "The highlighted region is the active analysis window. Event markers show all detected shots. "
-            "Burst shading is based on the full-file pass. When auto zoom is enabled, the waveform zooms "
+            "The highlighted region is the active analysis window. "
+            "Event markers show all detected shots. "
+            "Burst shading is based on the full-file pass. "
+            "When auto zoom is enabled, the waveform zooms "
             "to the selected burst/window automatically."
         )
 
@@ -510,8 +525,10 @@ if uploaded_file:
 
         st.subheader("Manual Shot Editing")
         st.write(
-            "Use the editor below to correct individual detections after choosing the burst or time window. "
-            "Uncheck false positives, adjust timestamps, or add missed shots. Metrics update from the edited list."
+            "Use the editor below to correct individual detections "
+            "after choosing the burst or time window. "
+            "Uncheck false positives, adjust timestamps, or add missed shots. "
+            "Metrics update from the edited list."
         )
 
         editable_df = events_to_table(selected_events)
@@ -562,7 +579,7 @@ if uploaded_file:
                     "Shot #": i + 1,
                     "Timestamp (s)": round(t, 4),
                     "Split (s)": round(split, 4) if split is not None else None,
-                    "Inst. RPM": int(round(inst_rpm)) if inst_rpm else None,
+                    "Inst. RPM": round(inst_rpm) if inst_rpm else None,
                     "Confidence": None
                     if e.get("confidence") is None
                     else round(float(e["confidence"]), 3),
@@ -606,7 +623,7 @@ if uploaded_file:
                     )
                     if seg_times.size
                     else None,
-                    "Mean RPM": int(round(float(bs["mean_rpm"])))
+                    "Mean RPM": round(float(bs["mean_rpm"]))
                     if bs.get("mean_rpm") is not None
                     else None,
                     "Median Split (s)": round(float(np.median(seg_splits)), 3)
@@ -649,8 +666,8 @@ if uploaded_file:
 
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Shots", f"{len(final_events)}")
-        c2.metric("Avg RPM", f"{int(round(mean_rpm))}" if mean_rpm is not None else "—")
-        c3.metric("Max RPM", f"{int(round(max_rpm))}" if max_rpm is not None else "—")
+        c2.metric("Avg RPM", f"{round(mean_rpm)}" if mean_rpm is not None else "—")
+        c3.metric("Max RPM", f"{round(max_rpm)}" if max_rpm is not None else "—")
         c4.metric("Bursts", f"{len(final_bursts)}")
 
         col1, col2 = st.columns(2)
@@ -705,15 +722,13 @@ if uploaded_file:
             b1.metric("Shots", f"{len(fused_events)}")
             b2.metric(
                 "Avg RPM",
-                f"{int(round(full_rof.get('mean_rpm')))}"
+                f"{round(full_rof.get('mean_rpm'))}"
                 if full_rof.get("mean_rpm") is not None
                 else "—",
             )
             b3.metric(
                 "Max RPM",
-                f"{int(round(full_rof.get('max_rpm')))}"
-                if full_rof.get("max_rpm") is not None
-                else "—",
+                f"{round(full_rof.get('max_rpm'))}" if full_rof.get("max_rpm") is not None else "—",
             )
             b4.metric("Bursts", f"{len(full_bursts)}")
 

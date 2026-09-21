@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import List, Dict, Optional
 
-
-def fuse_scores(audio_events: List[Dict], video_events: Optional[List[Dict]]) -> List[Dict]:
-    out: List[Dict] = []
+def fuse_scores(audio_events: list[dict], video_events: list[dict] | None) -> list[dict]:
+    out: list[dict] = []
     video_by_t = {}
     if video_events:
         for ve in video_events:

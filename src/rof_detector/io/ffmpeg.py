@@ -80,6 +80,7 @@ def validate_media_file(video_path: Path) -> dict:
 
     return meta
 
+
 def extract_audio_wav(video_path: Path, sr: int = 48000, timeout: int = 60) -> Path:
     """Extract mono WAV audio from a video using ffmpeg."""
     if video_path.suffix.lower() == ".wav":
