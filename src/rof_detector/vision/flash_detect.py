@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict, Optional
 
 import numpy as np
 
@@ -24,10 +23,10 @@ def _roi_patch(frame: np.ndarray, roi: ROI) -> np.ndarray:
 
 def confirm_shots_with_flash(
     video_path: Path,
-    audio_events: List[Dict],
-    roi: Optional[str],
+    audio_events: list[dict],
+    roi: str | None,
     roi_interactive: bool = False,
-) -> List[Dict]:
+) -> list[dict]:
     if cv2 is None:
         raise RuntimeError("opencv-python not installed. Install with: pip install -e '.[video]'")
 
@@ -47,7 +46,7 @@ def confirm_shots_with_flash(
     video_events = []
     for e in audio_events:
         t = float(e["t"])
-        idx = int(round(t * fps))
+        idx = round(t * fps)
         window = range(max(0, idx - 2), idx + 3)
 
         patches = []

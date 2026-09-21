@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import List, Dict
 import numpy as np
 
 
-def compute_rof(times_s: List[float]) -> Dict:
+def compute_rof(times_s: list[float]) -> dict:
     times = np.array(times_s, dtype=float)
     if times.size < 2:
         return {"n_shots": int(times.size), "duration_s": 0.0, "mean_rpm": None, "series": []}

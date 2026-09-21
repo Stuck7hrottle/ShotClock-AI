@@ -130,7 +130,7 @@ def _insert_recovery_candidates(
     if len(kept) < 2 or not borderline:
         return kept
 
-    recovered = list(sorted(kept, key=lambda e: float(e["t"])))
+    recovered = sorted(kept, key=lambda e: float(e["t"]))
     clusters = _cluster_events(recovered, cluster_gap_s)
 
     # Use plausible automatic-fire intervals only.

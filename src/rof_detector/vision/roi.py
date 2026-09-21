@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 try:
     import cv2
@@ -16,7 +15,7 @@ class ROI:
     w: int
     h: int
 
-    def as_tuple(self) -> Tuple[int, int, int, int]:
+    def as_tuple(self) -> tuple[int, int, int, int]:
         return (self.x, self.y, self.w, self.h)
 
 
