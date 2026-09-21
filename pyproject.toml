@@ -20,7 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 video = ["opencv-python>=4.8"]
 ui = ["streamlit>=1.27", "pandas>=2.1"]
-dev = ["pytest>=7.4", "ruff>=0.5"]
+dev = ["pytest>=7.4", "ruff==0.16.8"]
 
 [project.scripts]
 rof = "rof_detector.cli:app"
@@ -34,6 +34,14 @@ rof_detector = ["audio/model.json"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.ruff.lint]
+# Ruff's own documented stable default (pyflakes + a handful of pycodestyle
+# error checks). Made explicit and pinned alongside a fixed ruff version
+# above so CI doesn't silently pick up newer default-on rule categories
+# (pyupgrade, bugbear, tryceratops, ...) every time ruff ships a release --
+# that's what caused CI to fail on unrelated code with no local repro.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.format]
 quote-style = "double"
