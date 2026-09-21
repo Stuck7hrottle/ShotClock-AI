@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict
 
 import numpy as np
 from scipy.io import wavfile
 from scipy.signal import butter, filtfilt, find_peaks
 
-from rof_detector.audio.preprocess import highpass, normalize
 from rof_detector.audio.features import crest_factor, impulsiveness_kurtosis, is_clipped
+from rof_detector.audio.preprocess import highpass, normalize
+from rof_detector.audio.scoring import score_candidate
 
 
 def _frame_rms(x: np.ndarray, frame: int, hop: int) -> np.ndarray:
@@ -98,7 +98,7 @@ def _score_floor_from_sensitivity(sensitivity: float) -> float:
     return float(np.clip(floor, 0.24, 0.34))
 
 
-def _event_strength(e: Dict) -> float:
+def _event_strength(e: dict) -> float:
     f = e.get("audio_features", {})
     return float(
         e.get("audio_score", 0.0)
@@ -107,11 +107,11 @@ def _event_strength(e: Dict) -> float:
     )
 
 
-def _cluster_events(events: List[Dict], gap_s: float) -> List[List[Dict]]:
+def _cluster_events(events: list[dict], gap_s: float) -> list[list[dict]]:
     if not events:
         return []
     ev = sorted(events, key=lambda e: float(e["t"]))
-    clusters: List[List[Dict]] = [[ev[0]]]
+    clusters: list[list[dict]] = [[ev[0]]]
     for e in ev[1:]:
         if float(e["t"]) - float(clusters[-1][-1]["t"]) <= gap_s:
             clusters[-1].append(e)
@@ -121,12 +121,12 @@ def _cluster_events(events: List[Dict], gap_s: float) -> List[List[Dict]]:
 
 
 def _insert_recovery_candidates(
-    kept: List[Dict],
-    borderline: List[Dict],
+    kept: list[dict],
+    borderline: list[dict],
     *,
     min_sep_s: float,
     cluster_gap_s: float,
-) -> List[Dict]:
+) -> list[dict]:
     if len(kept) < 2 or not borderline:
         return kept
 
@@ -185,11 +185,11 @@ def _insert_recovery_candidates(
 
 
 def _cleanup_burst_structure(
-    events: List[Dict],
-    borderline: List[Dict],
+    events: list[dict],
+    borderline: list[dict],
     *,
     min_sep_s: float,
-) -> List[Dict]:
+) -> list[dict]:
     if len(events) < 2:
         return events
 
@@ -209,7 +209,7 @@ def _cleanup_burst_structure(
     if not multi_clusters:
         return events
 
-    cleaned: List[Dict] = []
+    cleaned: list[dict] = []
     for idx, cl in enumerate(clusters):
         if len(cl) >= 2:
             cleaned.extend(cl)
@@ -241,27 +241,35 @@ def _cleanup_burst_structure(
     return cleaned if cleaned else events
 
 
-def detect_shots_audio(
-    wav_path: Path,
-    *,
-    sensitivity: float = 0.48,
-    min_separation_ms: int = 35,
-    echo_window_ms: int = 30,
-    environment: str = "auto",
-) -> List[Dict]:
-    """Return list of audio events: {t, audio_score, audio_features}."""
+def _load_mono_float(wav_path: Path) -> tuple[int, np.ndarray]:
     sr, x = wavfile.read(str(wav_path))
     if x.ndim > 1:
         x = x[:, 0]
-
     if x.dtype.kind in ("i", "u"):
         maxv = np.iinfo(x.dtype).max
         x = (x.astype(np.float32) / maxv).astype(np.float32)
     else:
         x = x.astype(np.float32)
-
     x = highpass(x, sr, cutoff_hz=120.0)
     x = normalize(x)
+    return int(sr), x
+
+
+def find_candidates(
+    wav_path: Path,
+    *,
+    sensitivity: float = 0.48,
+    min_separation_ms: int = 35,
+    environment: str = "auto",
+) -> list[dict]:
+    """Return every onset-peak candidate with its raw acoustic features and
+    threshold context, before any accept/reject scoring is applied.
+
+    Shared by detect_shots_audio (which scores and filters these) and
+    train_shot_classifier.py (which labels them against ground truth to
+    train the scoring model in audio/scoring.py).
+    """
+    sr, x = _load_mono_float(wav_path)
 
     onset, hop = _onset_function(x, sr)
     k = _k_from_sensitivity(environment, sensitivity)
@@ -278,12 +286,10 @@ def detect_shots_audio(
         prominence=prom,
     )
 
-    candidates: List[Dict] = []
+    candidates: list[dict] = []
     win = int(0.025 * sr)
     heights = props.get("peak_heights", np.zeros(len(peaks), dtype=float))
     prominences = props.get("prominences", np.zeros(len(peaks), dtype=float))
-    score_floor = _score_floor_from_sensitivity(sensitivity)
-    recovery_floor = max(0.20, score_floor - 0.07)
 
     for j, pk in enumerate(peaks):
         t = (pk * hop) / sr
@@ -296,46 +302,72 @@ def detect_shots_audio(
         kurt = impulsiveness_kurtosis(w)
         clipped = is_clipped(w)
 
-        score = 0.0
-        score += min(1.0, (cf / 10.0)) * (0.52 if not clipped else 0.24)
-        score += min(1.0, (kurt / 50.0)) * 0.30
-
         peak_prom = float(prominences[j]) if j < len(prominences) else 0.0
         peak_height = float(heights[j]) if j < len(heights) else 0.0
-
         prom_ratio = peak_prom / max(prom, 1e-6)
         height_ratio = peak_height / max(thr, 1e-6)
 
-        score += min(0.22, max(0.0, prom_ratio - 1.0) * 0.10)
-        score += min(0.14, max(0.0, height_ratio - 1.0) * 0.05)
+        candidates.append(
+            {
+                "t": float(t),
+                "features": {
+                    "crest_factor": float(cf),
+                    "kurtosis": float(kurt),
+                    "clipped": bool(clipped),
+                    "onset_height": peak_height,
+                    "onset_prominence": peak_prom,
+                    "prom_ratio": float(prom_ratio),
+                    "height_ratio": float(height_ratio),
+                },
+                "threshold_context": {
+                    "threshold": float(thr),
+                    "onset_median": float(med),
+                    "onset_mad": float(mad),
+                    "k": float(k),
+                    "prominence_threshold": float(prom),
+                    "threshold_percentile": float(pctl),
+                    "threshold_percentile_value": float(thr_pctl),
+                },
+            }
+        )
 
-        # Penalize weak/transient nuisance events that barely clear threshold.
-        if prom_ratio < 1.18:
-            score -= 0.08
-        if height_ratio < 1.10:
-            score -= 0.05
+    return candidates
 
-        score = float(np.clip(score, 0.0, 1.0))
+
+def detect_shots_audio(
+    wav_path: Path,
+    *,
+    sensitivity: float = 0.48,
+    min_separation_ms: int = 35,
+    echo_window_ms: int = 30,
+    environment: str = "auto",
+) -> list[dict]:
+    """Return list of audio events: {t, audio_score, audio_features}."""
+    raw_candidates = find_candidates(
+        wav_path,
+        sensitivity=sensitivity,
+        min_separation_ms=min_separation_ms,
+        environment=environment,
+    )
+
+    score_floor = _score_floor_from_sensitivity(sensitivity)
+    recovery_floor = max(0.20, score_floor - 0.07)
+
+    candidates: list[dict] = []
+    for c in raw_candidates:
+        feats = c["features"]
+        ctx = c["threshold_context"]
+        score = score_candidate(feats)
 
         event = {
-            "t": float(t),
+            "t": c["t"],
             "audio_score": score,
             "audio_features": {
-                "crest_factor": float(cf),
-                "kurtosis": float(kurt),
-                "clipped": bool(clipped),
-                "onset_height": float(heights[j]) if j < len(heights) else None,
-                "onset_prominence": peak_prom,
+                **feats,
                 "threshold_method": "mad+prominence+cleanup",
-                "threshold": float(thr),
-                "onset_median": float(med),
-                "onset_mad": float(mad),
-                "k": float(k),
-                "prominence_threshold": float(prom),
+                **ctx,
                 "score_floor": float(score_floor),
                 "recovery_floor": float(recovery_floor),
-                "threshold_percentile": float(pctl),
-                "threshold_percentile_value": float(thr_pctl),
             },
         }
         candidates.append(event)
@@ -345,7 +377,7 @@ def detect_shots_audio(
 
     echo_window_s = echo_window_ms / 1000.0
     accepted.sort(key=lambda e: e["t"])
-    merged: List[Dict] = []
+    merged: list[dict] = []
     for e in accepted:
         if not merged:
             merged.append(e)
@@ -367,7 +399,7 @@ def detect_shots_audio(
 
     # Final sort and de-dup pass.
     cleaned.sort(key=lambda e: e["t"])
-    final_events: List[Dict] = []
+    final_events: list[dict] = []
     for e in cleaned:
         if not final_events or (e["t"] - final_events[-1]["t"]) > echo_window_s:
             final_events.append(e)

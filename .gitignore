@@ -12,3 +12,7 @@ ruff_cache/
 *.png
 *.json
 *.csv
+
+# Trained shot-classifier weights are a real source artifact, not
+# regenerated output -- ship them despite the blanket *.json ignore above.
+!src/rof_detector/audio/model.json

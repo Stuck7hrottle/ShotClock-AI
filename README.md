@@ -26,6 +26,12 @@ ShotClock‑AI identifies impulsive acoustic events using multiple signal featur
 - Peak prominence detection
 - Echo suppression
 
+Candidate onset peaks are scored by a small logistic-regression classifier
+(`src/rof_detector/audio/scoring.py`, weights in `audio/model.json`) trained
+on the synthetic regression dataset instead of a hand-tuned formula. If
+`model.json` is missing, detection falls back to the original heuristic
+scoring automatically. See **Training the Shot Classifier** below.
+
 These techniques allow reliable operation even with:
 
 - echoes
@@ -391,6 +397,26 @@ The ground truth file contains expected shot timestamps.
 
 ---
 
+# Training the Shot Classifier
+
+Onset-peak scoring is a logistic-regression model trained on the synthetic
+regression dataset rather than hand-tuned weights. Retrain it after changing
+`generate_test_audio_v2.py` or adding new scenarios:
+
+```bash
+python generate_test_audio_v2.py
+python train_shot_classifier.py
+```
+
+This holds out `08_slow_fire_with_bumps`, `09_double_taps_boundary`,
+`10_noisy_env_harsh`, and `13_echo_vs_doubletap_ambiguous` from training and
+reports validation precision/recall on them, then writes
+`src/rof_detector/audio/model.json`. Run `python batch_analyze_v2.py`
+afterward to confirm overall precision/recall/F1 didn't regress before
+committing a retrained model.
+
+---
+
 # Batch Analysis
 
 Evaluate detection performance:
@@ -470,11 +496,15 @@ Focus on these challenging scenarios:
 
 Using the included regression dataset:
 
-| Metric | Result |
+| Metric | Result (`batch_analyze_v2.py` defaults) |
 |------|------|
-| Precision | ~92–94% |
-| Recall | ~97–98% |
-| F1 Score | ~95% |
+| Precision | 94.4% |
+| Recall | 92.2% |
+| F1 Score | 93.3% |
+
+(measured after switching onset scoring to the trained classifier; rerun
+`batch_analyze_v2.py` yourself after any detector or dataset change — these
+numbers are only as good as the synthetic scenarios they're measured on)
 
 The system maintains high recall while preserving accurate burst timing and ROF statistics.
 

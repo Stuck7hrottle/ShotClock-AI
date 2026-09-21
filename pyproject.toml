@@ -28,6 +28,9 @@ rof = "rof_detector.cli:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+rof_detector = ["audio/model.json"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
