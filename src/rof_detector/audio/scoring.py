@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Optional
 
 import numpy as np
 
@@ -22,7 +21,7 @@ FEATURE_NAMES = [
 ]
 
 
-def feature_vector(features: Dict) -> np.ndarray:
+def feature_vector(features: dict) -> np.ndarray:
     # prom_ratio/height_ratio are peak-height-over-threshold ratios. On
     # near-silent synthetic audio the threshold can be almost zero, so raw
     # ratios can reach 1e5+; on real audio with a healthy noise floor the
@@ -53,17 +52,17 @@ class ShotScorer:
         self.std = np.asarray(std, dtype=np.float64)
 
     @classmethod
-    def load(cls, path: Path) -> "ShotScorer":
+    def load(cls, path: Path) -> ShotScorer:
         data = json.loads(path.read_text(encoding="utf-8"))
         return cls(data["weights"], data["bias"], data["mean"], data["std"])
 
-    def score(self, features: Dict) -> float:
+    def score(self, features: dict) -> float:
         z = (feature_vector(features) - self.mean) / self.std
         logit = float(np.dot(self.weights, z) + self.bias)
         return float(1.0 / (1.0 + np.exp(-logit)))
 
 
-def heuristic_score(features: Dict) -> float:
+def heuristic_score(features: dict) -> float:
     """Original hand-tuned scoring formula, kept as a fallback for
     environments where the trained model.json isn't available."""
     cf = float(features["crest_factor"])
@@ -86,11 +85,11 @@ def heuristic_score(features: Dict) -> float:
     return float(np.clip(score, 0.0, 1.0))
 
 
-_scorer: Optional[ShotScorer] = None
+_scorer: ShotScorer | None = None
 _scorer_loaded = False
 
 
-def _get_scorer() -> Optional[ShotScorer]:
+def _get_scorer() -> ShotScorer | None:
     global _scorer, _scorer_loaded
     if not _scorer_loaded:
         _scorer_loaded = True
@@ -99,7 +98,7 @@ def _get_scorer() -> Optional[ShotScorer]:
     return _scorer
 
 
-def score_candidate(features: Dict) -> float:
+def score_candidate(features: dict) -> float:
     scorer = _get_scorer()
     if scorer is not None:
         return scorer.score(features)

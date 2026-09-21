@@ -9,12 +9,12 @@ Usage:
     python generate_test_audio_v2.py   # if test_audio_v2/ doesn't exist yet
     python train_shot_classifier.py
 """
+
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -40,8 +40,8 @@ MATCH_TOLERANCE_S = 0.035
 
 
 def _label_candidates(
-    candidates: List[Dict], expected: List[float], tolerance_s: float
-) -> List[Tuple[Dict, int]]:
+    candidates: list[dict], expected: list[float], tolerance_s: float
+) -> list[tuple[dict, int]]:
     expected_sorted = sorted(expected)
     used = [False] * len(expected_sorted)
     labeled = []
@@ -64,9 +64,9 @@ def _label_candidates(
 
 def build_dataset(
     audio_dir: Path, truth_path: Path
-) -> Tuple[Dict[str, List[Tuple[np.ndarray, int]]], List[str]]:
+) -> tuple[dict[str, list[tuple[np.ndarray, int]]], list[str]]:
     truth = json.loads(truth_path.read_text(encoding="utf-8"))
-    by_scenario: Dict[str, List[Tuple[np.ndarray, int]]] = {}
+    by_scenario: dict[str, list[tuple[np.ndarray, int]]] = {}
     feature_names = FEATURE_NAMES
 
     for item in truth:
@@ -76,7 +76,7 @@ def build_dataset(
             continue
         expected = [float(t) for t in item.get("expected_primary_shots", [])]
 
-        examples: List[Tuple[np.ndarray, int]] = []
+        examples: list[tuple[np.ndarray, int]] = []
         for sens in TRAIN_SENSITIVITIES:
             candidates = find_candidates(wav_path, sensitivity=sens)
             for c, label in _label_candidates(candidates, expected, MATCH_TOLERANCE_S):
@@ -94,7 +94,7 @@ def train_logistic_regression(
     lr: float = 0.3,
     iters: int = 4000,
     max_neg_weight_ratio: float = 3.0,
-) -> Tuple[np.ndarray, float, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, float, np.ndarray, np.ndarray]:
     mean = X.mean(axis=0)
     std = X.std(axis=0)
     std[std < 1e-6] = 1.0
@@ -130,7 +130,7 @@ def train_logistic_regression(
 
 def evaluate(
     w: np.ndarray, b: float, mean: np.ndarray, std: np.ndarray, X: np.ndarray, y: np.ndarray
-) -> Dict[str, float]:
+) -> dict[str, float]:
     if len(y) == 0:
         return {"n": 0, "precision": 0.0, "recall": 0.0, "f1": 0.0}
     Xz = (X - mean) / std
@@ -155,9 +155,7 @@ def main() -> int:
     audio_dir = Path(args.audio_dir)
     truth_path = Path(args.truth)
     if not truth_path.exists():
-        raise SystemExit(
-            f"{truth_path} not found. Run `python generate_test_audio_v2.py` first."
-        )
+        raise SystemExit(f"{truth_path} not found. Run `python generate_test_audio_v2.py` first.")
 
     by_scenario, feature_names = build_dataset(audio_dir, truth_path)
 
@@ -180,10 +178,14 @@ def main() -> int:
 
     train_metrics = evaluate(w, b, mean, std, train_X, train_y)
     val_metrics = evaluate(w, b, mean, std, val_X, val_y)
-    print(f"Train: precision={train_metrics['precision']:.3f} recall={train_metrics['recall']:.3f} "
-          f"f1={train_metrics['f1']:.3f}")
-    print(f"Val:   precision={val_metrics['precision']:.3f} recall={val_metrics['recall']:.3f} "
-          f"f1={val_metrics['f1']:.3f}")
+    print(
+        f"Train: precision={train_metrics['precision']:.3f} recall={train_metrics['recall']:.3f} "
+        f"f1={train_metrics['f1']:.3f}"
+    )
+    print(
+        f"Val:   precision={val_metrics['precision']:.3f} recall={val_metrics['recall']:.3f} "
+        f"f1={val_metrics['f1']:.3f}"
+    )
 
     out_path = Path(args.out)
     out_path.write_text(

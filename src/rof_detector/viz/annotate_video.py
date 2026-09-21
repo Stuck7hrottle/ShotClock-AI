@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict
 
 try:
     import cv2
@@ -14,7 +13,7 @@ _MODERATE_COLOR_BGR = (49, 174, 253)  # orange
 _WEAK_COLOR_BGR = (39, 48, 215)  # red
 
 
-def _event_score(e: Dict) -> float:
+def _event_score(e: dict) -> float:
     # `confidence` is only meaningful once video confirmation has blended in;
     # without it, fuse_scores caps confidence at 0.7 * audio_score, which
     # would make every audio-only detection look weak regardless of how
@@ -36,7 +35,7 @@ def _event_color_bgr(score: float) -> tuple[int, int, int]:
     return _WEAK_COLOR_BGR
 
 
-def annotate_video_with_events(video_path: Path, events: List[Dict], out_path: Path) -> None:
+def annotate_video_with_events(video_path: Path, events: list[dict], out_path: Path) -> None:
     if cv2 is None:
         raise RuntimeError("opencv-python not installed. Install with: pip install -e '.[video]'")
 
@@ -54,10 +53,10 @@ def annotate_video_with_events(video_path: Path, events: List[Dict], out_path: P
 
     # Keep a short window per event so the label is readable rather than a
     # single-frame flash, and carry the event's confidence for coloring.
-    hold_frames = max(1, int(round(0.25 * fps)))
-    event_by_frame: Dict[int, Dict] = {}
+    hold_frames = max(1, round(0.25 * fps))
+    event_by_frame: dict[int, dict] = {}
     for e in events:
-        center = int(round(float(e["t"]) * fps))
+        center = round(float(e["t"]) * fps)
         for fi in range(center, center + hold_frames):
             event_by_frame[fi] = e
 

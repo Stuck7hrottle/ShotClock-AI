@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.io import wavfile
 from scipy.signal import spectrogram
-import matplotlib.pyplot as plt
 
 # Confidence tiers used to color-code events across the waveform and
 # spectrogram panels, so a strong detection is visually distinct from a
@@ -16,7 +15,7 @@ _MODERATE_COLOR = "#fdae61"  # 0.5 <= confidence < 0.75
 _WEAK_COLOR = "#d73027"  # confidence < 0.5
 
 
-def _event_score(e: Dict) -> float:
+def _event_score(e: dict) -> float:
     # `confidence` is only meaningful once video confirmation has blended in;
     # without it, fuse_scores caps confidence at 0.7 * audio_score, which
     # would make every audio-only detection look weak regardless of how
@@ -50,7 +49,7 @@ def _load_mono_float(wav_path: Path) -> tuple[int, np.ndarray]:
     return int(sr), x
 
 
-def plot_waveform_with_events(wav_path: Path, events: List[Dict], out_png: Path) -> None:
+def plot_waveform_with_events(wav_path: Path, events: list[dict], out_png: Path) -> None:
     sr, x = _load_mono_float(wav_path)
     t = np.arange(len(x), dtype=np.float32) / float(sr)
 

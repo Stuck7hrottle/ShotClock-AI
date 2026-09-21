@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Dict
 
 import numpy as np
 from scipy.io import wavfile
 from scipy.signal import butter, filtfilt, find_peaks
 
-from rof_detector.audio.preprocess import highpass, normalize
 from rof_detector.audio.features import crest_factor, impulsiveness_kurtosis, is_clipped
+from rof_detector.audio.preprocess import highpass, normalize
 from rof_detector.audio.scoring import score_candidate
 
 
@@ -99,7 +98,7 @@ def _score_floor_from_sensitivity(sensitivity: float) -> float:
     return float(np.clip(floor, 0.24, 0.34))
 
 
-def _event_strength(e: Dict) -> float:
+def _event_strength(e: dict) -> float:
     f = e.get("audio_features", {})
     return float(
         e.get("audio_score", 0.0)
@@ -108,11 +107,11 @@ def _event_strength(e: Dict) -> float:
     )
 
 
-def _cluster_events(events: List[Dict], gap_s: float) -> List[List[Dict]]:
+def _cluster_events(events: list[dict], gap_s: float) -> list[list[dict]]:
     if not events:
         return []
     ev = sorted(events, key=lambda e: float(e["t"]))
-    clusters: List[List[Dict]] = [[ev[0]]]
+    clusters: list[list[dict]] = [[ev[0]]]
     for e in ev[1:]:
         if float(e["t"]) - float(clusters[-1][-1]["t"]) <= gap_s:
             clusters[-1].append(e)
@@ -122,12 +121,12 @@ def _cluster_events(events: List[Dict], gap_s: float) -> List[List[Dict]]:
 
 
 def _insert_recovery_candidates(
-    kept: List[Dict],
-    borderline: List[Dict],
+    kept: list[dict],
+    borderline: list[dict],
     *,
     min_sep_s: float,
     cluster_gap_s: float,
-) -> List[Dict]:
+) -> list[dict]:
     if len(kept) < 2 or not borderline:
         return kept
 
@@ -186,11 +185,11 @@ def _insert_recovery_candidates(
 
 
 def _cleanup_burst_structure(
-    events: List[Dict],
-    borderline: List[Dict],
+    events: list[dict],
+    borderline: list[dict],
     *,
     min_sep_s: float,
-) -> List[Dict]:
+) -> list[dict]:
     if len(events) < 2:
         return events
 
@@ -210,7 +209,7 @@ def _cleanup_burst_structure(
     if not multi_clusters:
         return events
 
-    cleaned: List[Dict] = []
+    cleaned: list[dict] = []
     for idx, cl in enumerate(clusters):
         if len(cl) >= 2:
             cleaned.extend(cl)
@@ -262,7 +261,7 @@ def find_candidates(
     sensitivity: float = 0.48,
     min_separation_ms: int = 35,
     environment: str = "auto",
-) -> List[Dict]:
+) -> list[dict]:
     """Return every onset-peak candidate with its raw acoustic features and
     threshold context, before any accept/reject scoring is applied.
 
@@ -287,7 +286,7 @@ def find_candidates(
         prominence=prom,
     )
 
-    candidates: List[Dict] = []
+    candidates: list[dict] = []
     win = int(0.025 * sr)
     heights = props.get("peak_heights", np.zeros(len(peaks), dtype=float))
     prominences = props.get("prominences", np.zeros(len(peaks), dtype=float))
@@ -342,7 +341,7 @@ def detect_shots_audio(
     min_separation_ms: int = 35,
     echo_window_ms: int = 30,
     environment: str = "auto",
-) -> List[Dict]:
+) -> list[dict]:
     """Return list of audio events: {t, audio_score, audio_features}."""
     raw_candidates = find_candidates(
         wav_path,
@@ -354,7 +353,7 @@ def detect_shots_audio(
     score_floor = _score_floor_from_sensitivity(sensitivity)
     recovery_floor = max(0.20, score_floor - 0.07)
 
-    candidates: List[Dict] = []
+    candidates: list[dict] = []
     for c in raw_candidates:
         feats = c["features"]
         ctx = c["threshold_context"]
@@ -378,7 +377,7 @@ def detect_shots_audio(
 
     echo_window_s = echo_window_ms / 1000.0
     accepted.sort(key=lambda e: e["t"])
-    merged: List[Dict] = []
+    merged: list[dict] = []
     for e in accepted:
         if not merged:
             merged.append(e)
@@ -400,7 +399,7 @@ def detect_shots_audio(
 
     # Final sort and de-dup pass.
     cleaned.sort(key=lambda e: e["t"])
-    final_events: List[Dict] = []
+    final_events: list[dict] = []
     for e in cleaned:
         if not final_events or (e["t"] - final_events[-1]["t"]) > echo_window_s:
             final_events.append(e)
