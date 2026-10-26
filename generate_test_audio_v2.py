@@ -467,6 +467,43 @@ def build_scenarios(out_dir: Path) -> list[dict]:
         }
     )
 
+    scenarios.append(
+        {
+            # A burst followed by slow aimed shots: isolated shots must survive
+            # even when the file also contains burst-like clusters.
+            "name": "15_burst_then_aimed_singles.wav",
+            "shot_times": repeating(0.5, 0.1, 6) + [2.0, 3.2, 4.4],
+            "shot_profiles": ["crack", "clipped", "crack", "crack", "thump", "crack"]
+            + ["crack", "distant", "crack"],
+            "shot_amplitudes": [0.8] * 6 + [0.78, 0.7, 0.8],
+            "base_noise": ("pink", 0.015),
+        }
+    )
+
+    scenarios.append(
+        {
+            # A single hard reflector (wall/berm) returns every shot at the same
+            # ~58 ms lag -- longer than the default echo merge window.
+            "name": "16_wall_echo_fixed_delay.wav",
+            "shot_times": repeating(0.5, 0.12, 8),
+            "shot_profiles": ["crack", "crack", "clipped", "crack"] * 2,
+            "echo_chains": [[(58.0, 0.42, 3000.0)] for _ in range(8)],
+            "base_noise": ("pink", 0.014),
+        }
+    )
+
+    scenarios.append(
+        {
+            # Semi-auto singles, an automatic burst, then a trailing single, with
+            # a distant outdoor echo on every shot.
+            "name": "17_mixed_semi_and_auto_outdoor_echo.wav",
+            "shot_times": [0.5, 1.3] + repeating(2.0, 0.075, 8) + [3.5],
+            "shot_profiles": ["crack", "crack"] + ["crack", "clipped"] * 4 + ["crack"],
+            "echo_chains": [[(72.0, 0.3, 2400.0)] for _ in range(11)],
+            "base_noise": ("brown", 0.03),
+        }
+    )
+
     for config in scenarios:
         out_wav = out_dir / config["name"]
         truth = render_scenario(out_wav=out_wav, **{k: v for k, v in config.items() if k != "name"})

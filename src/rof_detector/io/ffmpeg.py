@@ -48,7 +48,7 @@ def probe_media(video_path: Path, timeout: int = 15) -> dict:
         raise RuntimeError(f"Could not parse ffprobe output: {e}") from e
 
 
-def validate_media_file(video_path: Path) -> dict:
+def validate_media_file(video_path: Path, require_video: bool = True) -> dict:
     meta = probe_media(video_path, timeout=15)
 
     streams = meta.get("streams", [])
@@ -60,11 +60,11 @@ def validate_media_file(video_path: Path) -> dict:
     has_video = any(s.get("codec_type") == "video" for s in streams)
     has_audio = any(s.get("codec_type") == "audio" for s in streams)
 
-    if not has_video:
+    if require_video and not has_video:
         raise RuntimeError("Uploaded file does not contain a video stream.")
 
     if not has_audio:
-        raise RuntimeError("Uploaded video does not contain an audio stream.")
+        raise RuntimeError("Uploaded file does not contain an audio stream.")
 
     duration_raw = format_info.get("duration")
     try:

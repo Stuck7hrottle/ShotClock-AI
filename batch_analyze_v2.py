@@ -113,7 +113,7 @@ def summarize_report(report: dict[str, Any]) -> dict[str, Any]:
     return {
         "detected_times": [float(e["t"]) for e in events if "t" in e],
         "detected_count": len(events),
-        "avg_rpm": rof.get("avg_rpm"),
+        "avg_rpm": rof.get("cyclic_rpm") or rof.get("mean_rpm"),
         "max_rpm": rof.get("max_rpm"),
         "burst_count": len(bursts),
     }
@@ -202,8 +202,8 @@ def main() -> int:
     parser.add_argument("--rof-cmd", default="rof", help="CLI executable to invoke")
     parser.add_argument("--environment", default="auto", choices=["auto", "indoor", "outdoor"])
     parser.add_argument("--sensitivity", type=float, default=0.5)
-    parser.add_argument("--min-separation-ms", type=int, default=50)
-    parser.add_argument("--echo-window-ms", type=int, default=45)
+    parser.add_argument("--min-separation-ms", type=int, default=35)
+    parser.add_argument("--echo-window-ms", type=int, default=30)
     parser.add_argument("--burst-gap-ms", type=int, default=250)
     parser.add_argument(
         "--match-tolerance-ms",

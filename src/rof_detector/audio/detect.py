@@ -6,7 +6,16 @@ import numpy as np
 from scipy.io import wavfile
 from scipy.signal import butter, filtfilt, find_peaks
 
-from rof_detector.audio.features import crest_factor, impulsiveness_kurtosis, is_clipped
+from rof_detector.audio.features import (
+    add_context_features,
+    crest_factor,
+    high_frequency_ratio,
+    impulsiveness_kurtosis,
+    is_clipped,
+    peak_amplitude,
+    rise_time_ms,
+    spectral_flatness,
+)
 from rof_detector.audio.preprocess import highpass, normalize
 from rof_detector.audio.scoring import score_candidate
 
@@ -25,7 +34,7 @@ def _bandpass(
     x: np.ndarray,
     sr: int,
     lo_hz: float = 250.0,
-    hi_hz: float = 4200.0,
+    hi_hz: float = 12000.0,
     order: int = 4,
 ) -> np.ndarray:
     nyq = 0.5 * sr
@@ -45,7 +54,8 @@ def _bandpass(
 
 
 def _onset_function(x: np.ndarray, sr: int) -> tuple[np.ndarray, int]:
-    # Light band-pass emphasis helps suppress slow boom / room tail energy.
+    # Band-pass emphasis suppresses slow boom / room tail energy while keeping
+    # the high-frequency crack that marks a direct muzzle blast.
     x_bp = _bandpass(x, sr)
 
     frame = int(0.010 * sr)  # 10 ms
@@ -73,22 +83,33 @@ def _k_from_sensitivity(environment: str, sensitivity: float) -> float:
 
 def _mad_threshold(onset: np.ndarray, k: float) -> tuple[float, float, float]:
     onset = np.asarray(onset, dtype=np.float32)
-    med = float(np.median(onset))
-    mad = float(np.median(np.abs(onset - med)))
+    # The onset function is half-wave rectified, so more than half of it is
+    # exactly zero and a plain median/MAD collapses to ~0 (which made the
+    # threshold, and with it the sensitivity setting, a no-op). Measure the
+    # noise floor over the rising frames only.
+    rising = onset[onset > 0.0]
+    if rising.size == 0:
+        rising = onset
+    med = float(np.median(rising))
+    mad = float(np.median(np.abs(rising - med)))
     mad = max(mad, 1e-6)
     thr = med + float(k) * mad
     return float(thr), float(med), float(mad)
 
 
-def _prominence_threshold(onset: np.ndarray, thr: float) -> float:
+def _prominence_threshold(onset: np.ndarray, thr: float, sensitivity: float = 0.5) -> float:
     onset = np.asarray(onset, dtype=np.float32)
+    # Minimum prominence relative to the loudest onset in the file: 0.08 at the
+    # default sensitivity, roughly halving at 1.0 and doubling at 0.1.
+    s = float(np.clip(sensitivity, 0.1, 1.0))
+    floor = 0.08 * 2.0 ** ((0.5 - s) * 2.5)
     positive = onset[onset > 0.0]
     if positive.size == 0:
-        return 0.08
+        return float(floor)
 
     q75 = float(np.percentile(positive, 75))
     q90 = float(np.percentile(positive, 90))
-    prom = max(0.08, 0.33 * max(thr, q75), 0.18 * q90)
+    prom = max(floor, 0.33 * max(thr, q75), 0.18 * q90)
     return float(prom)
 
 
@@ -196,7 +217,7 @@ def _cleanup_burst_structure(
     cluster_gap_s = 0.25
     events = sorted(events, key=lambda e: float(e["t"]))
 
-    # First try to recover borderline candidates inside already burst-like regions.
+    # Recover borderline candidates that fill holes inside burst-like regions.
     events = _insert_recovery_candidates(
         events,
         borderline,
@@ -204,41 +225,100 @@ def _cleanup_burst_structure(
         cluster_gap_s=cluster_gap_s,
     )
 
-    clusters = _cluster_events(events, cluster_gap_s)
-    multi_clusters = [cl for cl in clusters if len(cl) >= 2]
-    if not multi_clusters:
-        return events
+    return sorted(events, key=lambda e: float(e["t"]))
 
-    cleaned: list[dict] = []
-    for idx, cl in enumerate(clusters):
-        if len(cl) >= 2:
-            cleaned.extend(cl)
-            continue
 
-        e = cl[0]
-        strength = _event_strength(e)
-        t = float(e["t"])
-        prev_multi_gap = None
-        next_multi_gap = None
+def estimate_echo_lag_ms(candidates: list[dict]) -> float | None:
+    """Find a recording's dominant reflection delay, if it has one.
 
-        for j in range(idx - 1, -1, -1):
-            if len(clusters[j]) >= 2:
-                prev_multi_gap = t - float(clusters[j][-1]["t"])
-                break
-        for j in range(idx + 1, len(clusters)):
-            if len(clusters[j]) >= 2:
-                next_multi_gap = float(clusters[j][0]["t"]) - t
-                break
+    A wall or berm returns every shot after the same delay, so quieter
+    candidates that trail a louder one by a *consistent* lag are echoes, even
+    when that lag is longer than the echo merge window. Returns the median lag
+    of the largest group of such candidates (within +/-4 ms of each other) when
+    at least two candidates agree, else None.
+    """
+    lags = sorted(
+        float(c["features"]["louder_prev_lag_ms"])
+        for c in candidates
+        if float(c["features"].get("rel_prev_amp", 2.0)) < 0.7
+        and 15.0 <= float(c["features"].get("louder_prev_lag_ms", 0.0)) <= 150.0
+    )
+    best: list[float] = []
+    for i, lag in enumerate(lags):
+        group = [v for v in lags[i:] if v - lag <= 8.0]
+        if len(group) > len(best):
+            best = group
+    return float(np.median(best)) if len(best) >= 2 else None
 
-        # Keep only unusually strong singletons that are attached to a nearby real burst.
-        near_real_burst = (prev_multi_gap is not None and prev_multi_gap <= 0.18) or (
-            next_multi_gap is not None and next_multi_gap <= 0.18
-        )
-        if strength >= 0.92 and near_real_burst:
-            cleaned.append(e)
 
-    cleaned.sort(key=lambda e: float(e["t"]))
-    return cleaned if cleaned else events
+def _echo_rel_amp_limits(sensitivity: float) -> tuple[float, float]:
+    """(always-echo, echo-if-lag-matches) relative-amplitude limits.
+
+    A candidate quieter than `hard` times a candidate just before it is treated
+    as an echo outright; one quieter than `soft` is an echo when it also sits
+    at the recording's dominant echo lag. Higher sensitivity is more lenient.
+    """
+    s = float(np.clip(sensitivity, 0.1, 1.0))
+    hard = float(np.clip(0.40 - 0.30 * (s - 0.5), 0.2, 0.55))
+    soft = float(np.clip(0.70 - 0.20 * (s - 0.5), 0.55, 0.8))
+    return hard, soft
+
+
+def _is_echo(features: dict, echo_lag_ms: float | None, sensitivity: float) -> bool:
+    rel = float(features.get("rel_prev_amp", 2.0))
+    hard, soft = _echo_rel_amp_limits(sensitivity)
+    if rel < hard:
+        return True
+    lag = float(features.get("louder_prev_lag_ms", 0.0))
+    return echo_lag_ms is not None and rel < soft and abs(lag - echo_lag_ms) <= 5.0
+
+
+def _quiet_outlier_floor(events: list[dict], sensitivity: float) -> float:
+    """Peak-amplitude floor below which an event is too quiet to be one of the
+    shots being analysed (bumps, clicks, neighbouring lanes). Relative to the
+    median of the louder half of events, so a few nuisances can't drag it down."""
+    amps = sorted((float(e["audio_features"]["peak_amp"]) for e in events), reverse=True)
+    if len(amps) < 3:
+        return 0.0
+    ref = float(np.median(amps[: max(1, len(amps) // 2)]))
+    s = float(np.clip(sensitivity, 0.1, 1.0))
+    ratio = float(np.clip(0.30 - 0.25 * (s - 0.5), 0.15, 0.45))
+    return ratio * ref
+
+
+def _refine_onset_sample(x: np.ndarray, sr: int, center: int, frac: float = 0.3) -> int:
+    """Snap a coarse onset-frame position to the first sample where the
+    waveform reaches `frac` of its local peak.
+
+    The onset function works on 10 ms frames with a 2.5 ms hop, so a peak in it
+    only says "the shot starts somewhere in this frame". Muzzle blasts rise in
+    well under a millisecond, so the first sample that gets near the local
+    maximum is a much better (and consistent) estimate of when the shot happened.
+    """
+    s0 = max(0, center - int(0.004 * sr))
+    s1 = min(len(x), center + int(0.016 * sr))
+    if s1 <= s0:
+        return center
+    a = np.abs(x[s0:s1])
+    peak = float(np.max(a))
+    if peak <= 0.0:
+        return center
+    first = int(np.argmax(a >= frac * peak))
+    return s0 + first
+
+
+def _enforce_min_separation(
+    peaks: list[tuple[int, float, float]], min_sep_samples: int
+) -> list[tuple[int, float, float]]:
+    """Greedy non-maximum suppression on (sample, height, prominence) peaks:
+    strongest first, drop anything closer than `min_sep_samples` to a kept peak.
+    Allows ~1 ms of slack so shots exactly at the separation limit survive."""
+    min_sep = max(1, min_sep_samples - min_sep_samples // 50)
+    kept: list[tuple[int, float, float]] = []
+    for p in sorted(peaks, key=lambda p: p[2], reverse=True):
+        if all(abs(p[0] - q[0]) >= min_sep for q in kept):
+            kept.append(p)
+    return sorted(kept, key=lambda p: p[0])
 
 
 def _load_mono_float(wav_path: Path) -> tuple[int, np.ndarray]:
@@ -277,23 +357,30 @@ def find_candidates(
     pctl = _percentile_from_sensitivity(environment, sensitivity)
     thr_pctl = float(np.percentile(onset, pctl))
 
-    min_sep_frames = max(1, int((min_separation_ms / 1000.0) * sr / hop))
-    prom = _prominence_threshold(onset, thr)
+    prom = _prominence_threshold(onset, thr, sensitivity)
+    # Peak-pick with only a small spacing constraint, then enforce the real
+    # minimum separation on the refined (sample-accurate) times below. Doing
+    # it on the coarse onset grid suppresses real shots that follow a shot
+    # whose onset frame peaks late (slow-rising "thump" profiles).
     peaks, props = find_peaks(
         onset,
         height=thr,
-        distance=min_sep_frames,
+        distance=max(1, int(0.012 * sr / hop)),
         prominence=prom,
     )
-
-    candidates: list[dict] = []
-    win = int(0.025 * sr)
     heights = props.get("peak_heights", np.zeros(len(peaks), dtype=float))
     prominences = props.get("prominences", np.zeros(len(peaks), dtype=float))
 
-    for j, pk in enumerate(peaks):
-        t = (pk * hop) / sr
-        center = int(pk * hop)
+    refined = [
+        (_refine_onset_sample(x, sr, int(pk * hop)), float(heights[j]), float(prominences[j]))
+        for j, pk in enumerate(peaks)
+    ]
+    refined = _enforce_min_separation(refined, int((min_separation_ms / 1000.0) * sr))
+
+    candidates: list[dict] = []
+    win = int(0.025 * sr)
+    for center, peak_height, peak_prom in refined:
+        t = center / sr
         s0 = max(0, center - win)
         s1 = min(len(x), center + win)
         w = x[s0:s1]
@@ -302,8 +389,6 @@ def find_candidates(
         kurt = impulsiveness_kurtosis(w)
         clipped = is_clipped(w)
 
-        peak_prom = float(prominences[j]) if j < len(prominences) else 0.0
-        peak_height = float(heights[j]) if j < len(heights) else 0.0
         prom_ratio = peak_prom / max(prom, 1e-6)
         height_ratio = peak_height / max(thr, 1e-6)
 
@@ -318,6 +403,10 @@ def find_candidates(
                     "onset_prominence": peak_prom,
                     "prom_ratio": float(prom_ratio),
                     "height_ratio": float(height_ratio),
+                    "peak_amp": peak_amplitude(x, sr, center),
+                    "hf_ratio": high_frequency_ratio(x, sr, center),
+                    "rise_ms": rise_time_ms(x, sr, center),
+                    "flatness": spectral_flatness(x, sr, center),
                 },
                 "threshold_context": {
                     "threshold": float(thr),
@@ -331,6 +420,7 @@ def find_candidates(
             }
         )
 
+    add_context_features(candidates)
     return candidates
 
 
@@ -343,6 +433,26 @@ def detect_shots_audio(
     environment: str = "auto",
 ) -> list[dict]:
     """Return list of audio events: {t, audio_score, audio_features}."""
+    events, _ = detect_shots_audio_detailed(
+        wav_path,
+        sensitivity=sensitivity,
+        min_separation_ms=min_separation_ms,
+        echo_window_ms=echo_window_ms,
+        environment=environment,
+    )
+    return events
+
+
+def detect_shots_audio_detailed(
+    wav_path: Path,
+    *,
+    sensitivity: float = 0.48,
+    min_separation_ms: int = 35,
+    echo_window_ms: int = 30,
+    environment: str = "auto",
+) -> tuple[list[dict], list[dict]]:
+    """Like detect_shots_audio, but also return the candidates that were
+    rejected, each with a `reject_reason`, so a UI can offer them back."""
     raw_candidates = find_candidates(
         wav_path,
         sensitivity=sensitivity,
@@ -372,8 +482,27 @@ def detect_shots_audio(
         }
         candidates.append(event)
 
-    accepted = [e for e in candidates if float(e["audio_score"]) >= score_floor]
-    borderline = [e for e in candidates if recovery_floor <= float(e["audio_score"]) < score_floor]
+    echo_lag_ms = estimate_echo_lag_ms(raw_candidates)
+    for e in candidates:
+        e["audio_features"]["echo_lag_ms"] = echo_lag_ms
+        if _is_echo(e["audio_features"], echo_lag_ms, sensitivity):
+            e["reject_reason"] = "echo"
+        elif float(e["audio_score"]) < score_floor:
+            e["reject_reason"] = "low score"
+
+    quiet_floor = _quiet_outlier_floor(
+        [e for e in candidates if "reject_reason" not in e], sensitivity
+    )
+    for e in candidates:
+        if "reject_reason" not in e and float(e["audio_features"]["peak_amp"]) < quiet_floor:
+            e["reject_reason"] = "too quiet"
+
+    accepted = [e for e in candidates if "reject_reason" not in e]
+    borderline = [
+        e
+        for e in candidates
+        if e.get("reject_reason") == "low score" and float(e["audio_score"]) >= recovery_floor
+    ]
 
     echo_window_s = echo_window_ms / 1000.0
     accepted.sort(key=lambda e: e["t"])
@@ -406,4 +535,13 @@ def detect_shots_audio(
         elif _event_strength(e) > _event_strength(final_events[-1]):
             final_events[-1] = e
 
-    return final_events
+    kept = {id(e) for e in final_events}
+    rejected = []
+    for e in candidates:
+        if id(e) in kept:
+            continue
+        e.setdefault("reject_reason", "merged (echo window)")
+        rejected.append(e)
+    for e in final_events:
+        e.pop("reject_reason", None)
+    return final_events, rejected

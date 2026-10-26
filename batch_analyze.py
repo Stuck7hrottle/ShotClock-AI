@@ -22,7 +22,7 @@ def run_batch():
 
         # Construct the command.
         # Note: We omit 'detect' since your help output showed single-command mode.
-        cmd = ["rof", str(wav), "--out", str(output_json), "--echo-window-ms", "45"]
+        cmd = ["rof", str(wav), "--out", str(output_json), "--echo-window-ms", "30"]
 
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)

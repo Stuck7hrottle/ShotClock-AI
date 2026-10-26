@@ -14,9 +14,14 @@ def fuse_scores(audio_events: list[dict], video_events: list[dict] | None) -> li
         ve = video_by_t.get(round(t, 3))
         v = float(ve.get("video_score", 0.0)) if ve else 0.0
 
-        final = 0.7 * a + 0.3 * v
-        if a >= 0.75 or v >= 0.80:
-            final = max(final, 0.75)
+        if ve is None:
+            # No video evidence for this event: don't penalise it for missing
+            # a flash score nobody measured.
+            final = a
+        else:
+            final = 0.7 * a + 0.3 * v
+            if a >= 0.75 or v >= 0.80:
+                final = max(final, 0.75)
 
         out.append(
             {

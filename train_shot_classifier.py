@@ -8,6 +8,10 @@ ground_truth.json), which already carries labeled true-shot timestamps.
 Usage:
     python generate_test_audio_v2.py   # if test_audio_v2/ doesn't exist yet
     python train_shot_classifier.py
+
+    # Also learn from real recordings exported from the web UI
+    # ("Download as training data"), each unzipped into its own folder:
+    python train_shot_classifier.py --extra real_clips/*
 """
 
 from __future__ import annotations
@@ -29,6 +33,8 @@ VAL_SCENARIOS = {
     "09_double_taps_boundary.wav",
     "10_noisy_env_harsh.wav",
     "13_echo_vs_doubletap_ambiguous.wav",
+    "15_burst_then_aimed_singles.wav",
+    "17_mixed_semi_and_auto_outdoor_echo.wav",
 }
 
 # Sample candidates at a spread of sensitivities so the classifier sees
@@ -36,7 +42,9 @@ VAL_SCENARIOS = {
 # overfitting to a single operating point.
 TRAIN_SENSITIVITIES = [0.35, 0.48, 0.6, 0.75]
 
-MATCH_TOLERANCE_S = 0.035
+# Candidate times are refined to the sample, so a tight tolerance keeps echoes
+# and clicks a few tens of ms from a shot from being labelled as that shot.
+MATCH_TOLERANCE_S = 0.012
 
 
 def _label_candidates(
@@ -75,10 +83,15 @@ def build_dataset(
         if not wav_path.exists():
             continue
         expected = [float(t) for t in item.get("expected_primary_shots", [])]
+        # Real clips exported from the UI only vouch for the stretch a person
+        # reviewed; candidates outside it have unknown labels.
+        lo, hi = item.get("labeled_range") or (float("-inf"), float("inf"))
 
         examples: list[tuple[np.ndarray, int]] = []
         for sens in TRAIN_SENSITIVITIES:
-            candidates = find_candidates(wav_path, sensitivity=sens)
+            candidates = [
+                c for c in find_candidates(wav_path, sensitivity=sens) if lo <= c["t"] <= hi
+            ]
             for c, label in _label_candidates(candidates, expected, MATCH_TOLERANCE_S):
                 examples.append((feature_vector(c["features"]), label))
         by_scenario[fname] = examples
@@ -150,6 +163,12 @@ def main() -> int:
     parser.add_argument("--audio-dir", default="test_audio_v2")
     parser.add_argument("--truth", default="test_audio_v2/ground_truth.json")
     parser.add_argument("--out", default=str(MODEL_PATH))
+    parser.add_argument(
+        "--extra",
+        nargs="*",
+        default=[],
+        help="Extra labeled dirs (each with WAVs + ground_truth.json), added to training.",
+    )
     args = parser.parse_args()
 
     audio_dir = Path(args.audio_dir)
@@ -158,10 +177,19 @@ def main() -> int:
         raise SystemExit(f"{truth_path} not found. Run `python generate_test_audio_v2.py` first.")
 
     by_scenario, feature_names = build_dataset(audio_dir, truth_path)
+    for extra in args.extra:
+        extra_dir = Path(extra)
+        extra_truth = extra_dir / "ground_truth.json"
+        if not extra_truth.exists():
+            raise SystemExit(f"{extra_truth} not found")
+        extra_examples, _ = build_dataset(extra_dir, extra_truth)
+        for fname, examples in extra_examples.items():
+            by_scenario[f"{extra_dir.name}/{fname}"] = examples
+        print(f"Added {sum(map(len, extra_examples.values()))} examples from {extra_dir}")
 
     train_X, train_y, val_X, val_y = [], [], [], []
     for fname, examples in by_scenario.items():
-        is_val = fname in VAL_SCENARIOS
+        is_val = Path(fname).name in VAL_SCENARIOS
         for x, label in examples:
             (val_X if is_val else train_X).append(x)
             (val_y if is_val else train_y).append(label)
