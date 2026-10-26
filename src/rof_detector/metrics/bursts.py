@@ -42,7 +42,9 @@ def summarize_bursts(times_s: list[float], bursts: list[dict]) -> list[dict]:
                 "end_t": float(seg[-1]),
                 "n_shots": int(seg.size),
                 "duration_s": float(seg[-1] - seg[0]),
-                "mean_rpm": float(np.mean(rpm)),
+                # Shots per minute across the burst (60 / mean split); the mean
+                # of per-split RPM values would overstate it.
+                "mean_rpm": float(60.0 * (seg.size - 1) / (seg[-1] - seg[0])),
                 "median_rpm": float(np.median(rpm)),
                 "max_rpm": float(np.max(rpm)),
             }

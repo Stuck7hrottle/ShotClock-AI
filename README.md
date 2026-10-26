@@ -1,7 +1,7 @@
 
 # ShotClock-AI
 
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
 ![Status](https://img.shields.io/badge/status-active-success)
@@ -20,11 +20,12 @@ The detector is built around **robust signal‑processing techniques rather than
 
 ShotClock‑AI identifies impulsive acoustic events using multiple signal features:
 
-- Adaptive amplitude thresholding
-- Crest factor analysis
-- Kurtosis analysis
-- Peak prominence detection
-- Echo suppression
+- Adaptive noise-floor thresholding (driven by the sensitivity setting)
+- Crest factor, kurtosis and peak prominence
+- Spectral shape (high-frequency share, flatness) and rise time
+- Sample-accurate onset timing (~1 ms)
+- Echo rejection that learns each recording's reflection delay, plus
+  relative-loudness checks against the preceding shot
 
 Candidate onset peaks are scored by a small logistic-regression classifier
 (`src/rof_detector/audio/scoring.py`, weights in `audio/model.json`) trained
@@ -85,7 +86,7 @@ The detector includes logic to handle difficult recording conditions:
 Clone the repository:
 
 ```bash
-git clone https://github.com/<your-username>/ShotClock-AI.git
+git clone https://github.com/Stuck7hrottle/ShotClock-AI.git
 cd ShotClock-AI
 ```
 
@@ -191,18 +192,25 @@ Example JSON output:
 {
   "events": [
     {
-      "t": 0.495,
-      "confidence": 0.52,
-      "audio_score": 0.74
+      "t": 0.5006,
+      "confidence": 0.97,
+      "audio_score": 0.97
     }
   ],
   "rof": {
-    "mean_rpm": 720.4,
-    "max_rpm": 1040.2
+    "cyclic_rpm": 801.3,
+    "mean_rpm": 245.1,
+    "max_rpm": 820.4
   },
   "bursts": []
 }
 ```
+
+- `cyclic_rpm`: rate within bursts only (splits up to `--burst-gap-ms`). This is
+  the gun's rate of fire and the number to quote.
+- `mean_rpm`: shots per minute from the first shot to the last, pauses included
+  (60 / mean split).
+- Per-burst `mean_rpm` in `burst_summary` is 60 x (shots - 1) / burst duration.
 
 ---
 
@@ -230,12 +238,12 @@ http://localhost:8501
 
 Typical workflow:
 
-1. Upload a **video or audio file**
-2. The detector runs automatically
+1. Upload a **video (MP4/MOV/AVI) or WAV file**
+2. The detector runs automatically (results are cached, so moving sliders is instant)
 3. Choose an **analysis target**
-4. Inspect the waveform
-5. Correct detections if necessary
-6. Export results
+4. Inspect the waveform and **listen** to any shot or rejected candidate
+5. Correct detections if necessary and click **Apply edits**
+6. Export results, and optionally the corrected labels as **training data**
 
 The interface is designed for **manual verification and detailed analysis** of complex recordings.
 
@@ -270,6 +278,7 @@ Useful when:
 The interface includes a waveform viewer showing:
 
 - detected shot timestamps
+- candidates the detector rejected (dotted), with the reason
 - burst groupings
 - selected analysis window
 
@@ -293,6 +302,10 @@ Users can:
 - remove false positives
 - adjust timestamps
 - add missed shots
+- add back rejected candidates with one click
+
+Edits are kept while moving between bursts and windows; **Reset to detected**
+discards them.
 
 After edits the system automatically recomputes:
 
@@ -322,6 +335,12 @@ Full analysis report including:
 - burst statistics
 - ROF metrics
 - edited event list
+- rejected candidates
+
+### Training data (ZIP)
+
+The audio plus your corrected shot times for the selected window, in the same
+layout as `test_audio_v2/`. See **Training the Shot Classifier**.
 
 ---
 
@@ -409,11 +428,29 @@ python train_shot_classifier.py
 ```
 
 This holds out `08_slow_fire_with_bumps`, `09_double_taps_boundary`,
-`10_noisy_env_harsh`, and `13_echo_vs_doubletap_ambiguous` from training and
-reports validation precision/recall on them, then writes
+`10_noisy_env_harsh`, `13_echo_vs_doubletap_ambiguous`,
+`15_burst_then_aimed_singles` and `17_mixed_semi_and_auto_outdoor_echo` from
+training and reports validation precision/recall on them, then writes
 `src/rof_detector/audio/model.json`. Run `python batch_analyze_v2.py`
 afterward to confirm overall precision/recall/F1 didn't regress before
 committing a retrained model.
+
+### Training on real recordings
+
+Synthetic audio only goes so far: real phone recordings have codec artifacts,
+automatic gain control and clipping that the generator does not model. The
+single most effective way to improve detection is to add real labeled clips:
+
+1. In the web UI, review a clip, fix any mistakes and click **Apply edits**.
+2. Download **Training data (ZIP)** and unzip it, e.g. into `real_clips/`.
+3. Retrain with the real clips included:
+
+```bash
+python train_shot_classifier.py --extra real_clips/*
+```
+
+Only the window you reviewed is used for training, so unreviewed parts of a
+long recording don't become false labels.
 
 ---
 
@@ -428,16 +465,14 @@ python batch_analyze_v2.py
 Example output:
 
 ```
-Expected shots: 128
-Detected events: 135
-
-True positives: 125
-False positives: 10
-False negatives: 3
-
-Precision: 92.6%
-Recall: 97.6%
-F1 score: 95.0%
+Expected primary shots: 156
+Detected events:         152
+True positives:          150
+False positives:         2
+False negatives:         6
+Precision:               98.68%
+Recall:                  96.15%
+F1 score:                97.40%
 ```
 
 The script also produces a JSON regression report.
@@ -455,6 +490,9 @@ The script also produces a JSON regression report.
 | interference | transient noise |
 | slow fire | isolated shots |
 | double taps | close‑interval detection |
+| burst then aimed singles | isolated shots next to bursts |
+| wall echo, fixed delay | echoes longer than the merge window |
+| mixed semi/auto, outdoor echo | everything at once |
 
 ---
 
@@ -498,11 +536,13 @@ Using the included regression dataset:
 
 | Metric | Result (`batch_analyze_v2.py` defaults) |
 |------|------|
-| Precision | 94.4% |
-| Recall | 92.2% |
-| F1 Score | 93.3% |
+| Precision | 98.7% |
+| Recall | 96.2% |
+| F1 Score | 97.4% |
 
-(measured after switching onset scoring to the trained classifier; rerun
+(17 scenarios, 156 shots; the previous detector scored 89.8% F1 on the same
+set at its old defaults and 90.6% at these defaults. Validation F1 on the
+held-out scenarios is 0.90. Rerun
 `batch_analyze_v2.py` yourself after any detector or dataset change — these
 numbers are only as good as the synthetic scenarios they're measured on)
 

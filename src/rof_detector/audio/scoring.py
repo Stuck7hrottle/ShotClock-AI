@@ -18,6 +18,9 @@ FEATURE_NAMES = [
     "onset_prominence",
     "prom_ratio",
     "height_ratio",
+    "hf_ratio",
+    "rise_ms",
+    "flatness",
 ]
 
 
@@ -37,6 +40,9 @@ def feature_vector(features: dict) -> np.ndarray:
             float(features["onset_prominence"]),
             np.log1p(max(0.0, float(features["prom_ratio"]))),
             np.log1p(max(0.0, float(features["height_ratio"]))),
+            float(features["hf_ratio"]),
+            min(float(features["rise_ms"]), 15.0),
+            float(features["flatness"]),
         ],
         dtype=np.float64,
     )
@@ -94,7 +100,11 @@ def _get_scorer() -> ShotScorer | None:
     if not _scorer_loaded:
         _scorer_loaded = True
         if MODEL_PATH.exists():
-            _scorer = ShotScorer.load(MODEL_PATH)
+            data = json.loads(MODEL_PATH.read_text(encoding="utf-8"))
+            # A model trained on a different feature set would silently
+            # mis-score every candidate; fall back to the heuristic instead.
+            if data.get("feature_names") == FEATURE_NAMES:
+                _scorer = ShotScorer(data["weights"], data["bias"], data["mean"], data["std"])
     return _scorer
 
 
